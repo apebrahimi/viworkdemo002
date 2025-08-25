@@ -43,9 +43,13 @@ object Config {
         return when (getEnvironment()) {
             ENV_LOCAL -> {
                 // For emulator, use 10.0.2.2, for physical device use local IP
-                if (isEmulator()) {
+                val isEmulatorDevice = isEmulator()
+                Log.d(TAG, "Environment: LOCAL, Is Emulator: $isEmulatorDevice")
+                if (isEmulatorDevice) {
+                    Log.d(TAG, "Using emulator URL: $DEFAULT_LOCAL_URL")
                     DEFAULT_LOCAL_URL
                 } else {
+                    Log.d(TAG, "Using device URL: $DEFAULT_LOCAL_DEVICE_URL")
                     DEFAULT_LOCAL_DEVICE_URL
                 }
             }
@@ -113,7 +117,10 @@ object Config {
             android.os.Build.MODEL.contains("Android SDK built for x86") ||
             android.os.Build.MANUFACTURER.contains("Genymotion") ||
             (android.os.Build.BRAND.startsWith("generic") && android.os.Build.DEVICE.startsWith("generic")) ||
-            "google_sdk" == android.os.Build.PRODUCT
+            "google_sdk" == android.os.Build.PRODUCT ||
+            android.os.Build.MODEL.contains("Pixel") && android.os.Build.MANUFACTURER.contains("Google") ||
+            android.os.Build.PRODUCT.contains("sdk") ||
+            android.os.Build.PRODUCT.contains("emulator")
         } catch (e: Exception) {
             Log.e(TAG, "Error checking if emulator", e)
             false

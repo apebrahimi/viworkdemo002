@@ -1,0 +1,63 @@
+name: viworks-admin-panel
+region: nyc
+services:
+- name: viworks-backend
+  source_dir: /viworks-admin-panel/backend
+  github:
+    repo: your-github-repo
+    branch: main
+  run_command: ./viworks-admin-backend
+  environment_slug: rust
+  instance_count: 1
+  instance_size_slug: basic-xxs
+  envs:
+  - key: DATABASE_URL
+    value: ${viworks-postgres.DATABASE_URL}
+  - key: REDIS_URL
+    value: ${viworks-redis.REDIS_URL}
+  - key: JWT_SECRET
+    value: your-super-secret-jwt-key-change-in-production
+  - key: NODE_ENV
+    value: production
+  - key: LOG_LEVEL
+    value: info
+  - key: BCRYPT_ROUNDS
+    value: "12"
+  - key: RATE_LIMIT_WINDOW
+    value: "900000"
+  - key: RATE_LIMIT_MAX
+    value: "100"
+  - key: CORS_ORIGIN
+    value: https://viworks-backend-${APP_ID}.ondigitalocean.app
+  - key: ADMIN_PANEL_URL
+    value: https://viworks-backend-${APP_ID}.ondigitalocean.app
+
+- name: viworks-frontend
+  source_dir: /viworks-admin-panel/frontend
+  github:
+    repo: your-github-repo
+    branch: main
+  run_command: npm start
+  environment_slug: node-js
+  instance_count: 1
+  instance_size_slug: basic-xxs
+  envs:
+  - key: NODE_ENV
+    value: production
+  - key: NEXT_PUBLIC_API_URL
+    value: https://viworks-backend-${APP_ID}.ondigitalocean.app
+  - key: NEXT_PUBLIC_WS_URL
+    value: wss://viworks-backend-${APP_ID}.ondigitalocean.app
+
+databases:
+- name: viworks-postgres
+  engine: PG
+  version: "15"
+  size: db-s-1vcpu-1gb
+  db_name: viworks_admin
+  db_user: admin
+
+- name: viworks-redis
+  engine: REDIS
+  version: "7"
+  size: db-s-1vcpu-1gb
