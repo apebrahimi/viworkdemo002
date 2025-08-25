@@ -1,0 +1,331 @@
+05-demo-happy-path-en.md
+
+ViWorkS – End-to-End Demo Flow (Mac Client + Android 2FA + Linux Gateway)
+
+Goal: From user creation to secure connection and isolated browser access, with admin visibility and control — all in one coherent, testable demo flow.
+Actors: Admin (Web Panel), Mac Client, Android App, Backend (API), Gateway Agent (on Linux gateway).
+
+⸻
+
+0) Pre-demo assumptions (keep these true during the demo)
+	•	Mac Client is installed and signed; it can:
+	•	call Backend over HTTPS with SPKI pinning,
+	•	show Login → 2FA code prompt → Preflight → Fetch Config → SPA → stunnel → OpenVPN,
+	•	post client logs to the Backend.
+	•	Android App is installed for the user; it can receive OTP (6 digits, TTL=120s) via push or short polling and display it.
+	•	Linux Gateway is online with:
+	•	fwknop (SPA), stunnel, OpenVPN/SoftEther (OpenVPN-compatible),
+	•	nginx reverse-proxy,
+	•	Docker with jlesage/firefox,
+	•	Gateway Agent (small daemon) connected to Backend (WebSocket or HTTPS long-poll) to run safe tasks.
+	•	Admin Panel is reachable; Admin can create/activate users, approve device binding requests, view/terminate sessions, see gateway metrics.
+	•	The existing shell scripts (user create, dashboard user add, container spawn) are wrapped and called by the Gateway Agent with input validation and proper error handling.
+
+⸻
+
+1) Create & activate the user (Admin)
+
+(What to show: how quickly a new user becomes “ready”)
+
+Step
+	1.	Admin → Web Panel → Users → “Create User”:
+Input: username=keyvan, email=user.demo@company.tld, mobile=09xxxxxxxxx, policy window e.g. Sat-Thu 08:00–18:00, device_binding = ON.
+	2.	Backend creates the record (status=pending).
+	3.	Admin → “Activate” → Backend calls Gateway Agent to provision VPN user.
+
+Backend → Agent: create VPN user
+
+POST /v1/agent/user/create
+
+{ "username": "keyvan", "password": "<random-strong-or-admin-chooses>" }
+
+Agent performs (safely, no shell injection):
+	•	SoftEther/OpenVPN user create + password set (your script logic), parse success lines only.
+	•	If you must also maintain a local web-dashboard user, Agent updates that securely (hashing + safe file edit + syntax/health check).
+
+Response (Agent → Backend):
+
+{ "ok": true }
+
+Success indicators
+	•	Admin Panel: user card shows Active.
+	•	Audit log events: USER_CREATED, VPN_USER_CREATED.
+
+⸻
+
+2) First-time Android device binding (stronger security)
+
+(What to show: controlled device pairing)
+
+Step
+	1.	User opens Android app → enters username/password (or uses the account handover link/QR).
+App computes a device_fingerprint (stable ID) and calls:
+
+POST /v1/device/bind-request
+{ "username": "keyvan", "fingerprint": "<ANDROID-FP-HASH>" }
+
+
+	2.	Admin Panel → Device Requests: approve the pending request.
+	3.	Backend marks device_binding=true, stores the fingerprint hash.
+
+Success indicators
+	•	Android: “Your device has been registered.”
+	•	Admin Panel: request disappears from queue; user shows “Device bound”.
+	•	Audit: DEVICE_BIND_APPROVED.
+
+Note: If you must skip device binding for the demo, keep the API but autoadopt; still emit the audit log for narration.
+
+⸻
+
+3) Mac Client Login + 2FA (OTP via Android app)
+
+(What to show: strong auth with short-lived code and device binding)
+
+Step
+	1.	User opens Mac Client → enters username/password → Client calls:
+
+POST /v1/auth/login
+{ "username": "keyvan", "password": "••••••••" }
+
+Response:
+
+{ "success": true, "data": { "session_id": "SID123", "requires_2fa": true } }
+
+
+	2.	Client initiates the second factor:
+
+POST /v1/auth/challenge/initiate
+{ "session_id": "SID123" }
+
+
+	3.	Backend issues an OTP 6-digit with TTL=120s and delivers to Android app (push) or makes it available for the app to poll:
+	•	App calls: GET /v1/auth/challenge/code?session_id=SID123
+Response: { "code": "834219", "ttl": 120 }
+	4.	User reads the code on Android and types it into the Mac Client:
+
+POST /v1/auth/challenge/verify
+{ "session_id": "SID123", "code": "834219" }
+
+Response:
+
+{ "success": true, "data": { "access_token": "JWT...", "refresh_token": "R...", "expires_in": 900 } }
+
+
+
+UI microcopy (Mac)
+	•	“A 6-digit code has been sent to your registered device. You have 120 seconds.”
+	•	On error: “Invalid or expired code. Please try again.”
+
+Success indicators
+	•	Mac Client: proceeds to “Secure Connection” screen.
+	•	Admin Panel Logs: AUTH_LOGIN_SUCCESS, OTP_ISSUED, OTP_VERIFIED.
+
+⸻
+
+4) Client Preflight & Bootstrap (fetch configs)
+
+(What to show: safety checks before any network action)
+
+Step
+	1.	Preflight checks (Mac Client):
+	•	VPN inactive ✔︎
+	•	Timezone == Asia/Tehran ✔︎
+	•	Network reachability ✔︎
+	2.	Fetch connection settings:
+
+GET /v1/client/bootstrap           (Authorization: Bearer <access_token>)
+
+Response:
+
+{
+  "fwknop": { "remote_ip": "GW_IP", "key_rijndael": "...", "key_hmac": "..." },
+  "stunnel": {
+    "server": "gw.example.com",
+    "port": 8443,
+    "ca_pem": "-----BEGIN CERTIFICATE-----...",
+    "client_cert": "-----BEGIN CERTIFICATE-----...",
+    "client_key": "-----BEGIN PRIVATE KEY-----..."
+  },
+  "openvpn": {
+    "base_ovpn": "<file contents>",
+    "auth": { "type": "user-pass", "username": "keyvan", "password": "•••" }
+  },
+  "browser": { "policy": "per-session" }
+}
+
+
+
+UI microcopy
+	•	“Preflight passed.”
+	•	“Secure settings fetched. Continuing…”
+
+Success indicators
+	•	Admin Panel Logs: CLIENT_PREFLIGHT_OK, BOOTSTRAP_ISSUED.
+
+⸻
+
+5) SPA → stunnel → OpenVPN (the secure path comes up)
+
+(What to show: step-by-step status to build trust)
+
+Step
+
+5.1 SPA (Single Packet Authorization)
+	•	Client constructs SPA args safely (no shell) and sends the fwknop packet:
+	•	remote_ip = GW_IP
+	•	key_rijndael, key_hmac from bootstrap
+	•	Client shows: “Activating stealth access…”
+	•	Then Client probes gw.example.com:8443 with exponential backoff (100ms → 6s, max 15s).
+
+Expected: 8443 becomes open → proceed.
+
+5.2 stunnel
+	•	Client starts a local stunnel instance (env cleared, absolute path):
+	•	Local endpoint: 127.0.0.1:9443
+	•	Remote: gw.example.com:8443
+	•	TLS trust = ca_pem; client auth = client_cert/client_key
+	•	Client shows: “TLS tunnel established.”
+
+5.3 OpenVPN
+	•	Client prepares temp.ovpn (permissions: user-only, create_new):
+	•	Rewrites remote to 127.0.0.1 9443
+	•	Inserts hardening lines if missing:
+	•	block-outside-dns (Windows; skip on macOS)
+	•	data-ciphers AES-256-GCM:AES-128-GCM
+	•	auth SHA256
+	•	Client launches OpenVPN (env cleared, absolute path):
+	•	Waits for “Initialization Sequence Completed”.
+	•	Client shows: “Secure connection established.”
+	•	Client reports to Backend that VPN is up (with virtual IP if available).
+
+Success indicators
+	•	Admin Panel Logs:
+SPA_SENT, PORT_PROBE_OPEN, STUNNEL_UP, OPENVPN_CONNECTED, SESSION_CONNECTED.
+	•	Admin Sessions View: +1 active session for keyvan.
+
+Troubleshooting messaging (don’t show unless needed):
+	•	If probe fails: “Gateway did not open the port after SPA. Please retry or contact admin.”
+	•	If stunnel fails: “TLS handshake failed. Check certificate pin or time.”
+	•	If OpenVPN fails: “Tunnel could not be established. Please retry.”
+
+⸻
+
+6) Spawn isolated browser container (per session URL)
+
+(What to show: automatic, ephemeral, user-isolated workspace)
+
+Step
+	1.	Backend (on “VPN connected” event) calls Gateway Agent:
+
+POST /v1/agent/container/spawn
+{ "username": "keyvan", "session_id": "SID123" }
+
+
+	2.	Agent:
+	•	Finds a free port 5800+,
+	•	Runs jlesage/firefox:latest with --shm-size 2g, volume per session,
+	•	Generates RANDOM_PATH (32 chars [A-Za-z0-9]),
+	•	Adds to nginx:
+
+location /<RANDOM_PATH>/ {
+  proxy_pass http://127.0.0.1:<PORT>/;
+}
+
+
+	•	nginx -t && systemctl reload nginx (reload only if config test passes),
+	•	Optionally health-checks the new path.
+
+	3.	Agent → Backend:
+
+{ "url": "https://gw.example.com/<RANDOM_PATH>/" }
+
+
+	4.	Backend → Mac Client: send the URL; Client displays “Open isolated browser”.
+
+Success indicators
+	•	User opens https://gw.example.com/<RANDOM_PATH>/ (from within the VPN).
+	•	Admin Panel: session card shows the container URL, start time, node, and resource usage.
+
+Note: The random path plus the VPN requirement adds obscurity over a private channel; you can mention it in the demo as part of isolation & least exposure.
+
+⸻
+
+7) Admin control: terminate the session live
+
+(What to show: enterprise-grade control & safety)
+
+Step
+	1.	Admin Panel → Sessions → Select user keyvan → “Terminate Session”.
+	2.	Backend → Agent:
+
+POST /v1/agent/session/terminate
+{ "session_id": "SID123" }
+
+Agent performs:
+	•	Stops/removes the user’s container,
+	•	Removes the location /<RANDOM_PATH>/ block from nginx (idempotent, with rollback on error),
+	•	Optionally asks VPN server to drop the session (if tracked),
+	•	Reloads nginx after config test.
+
+	3.	Mac Client receives a server push/poll event “session terminated by admin”, closes OpenVPN/stunnel gracefully, wipes temp files, returns to “Login”.
+
+Success indicators
+	•	Mac Client: toast “Your session was terminated by the administrator.”
+	•	Admin Panel: session moves to Closed; active sessions counter −1.
+	•	Audit: SESSION_TERMINATED_BY_ADMIN, CONTAINER_REMOVED.
+
+⸻
+
+8) User Logout (client-side hygiene)
+
+(What to show: clean teardown & no secret residue)
+
+Step
+	•	User clicks Logout on the Mac Client:
+	•	Access/refresh tokens cleared (DPAPI/Keychain entries removed if saved),
+	•	In-memory secrets zeroized,
+	•	Any temp files (ovpn, creds) securely deleted,
+	•	Client returns to Login.
+
+Success indicators
+	•	Admin Panel Logs: CLIENT_LOGOUT.
+	•	Mac Client: ready for a fresh login.
+
+⸻
+
+9) What to narrate & show during the demo (cheat-sheet)
+	•	Security by design: stealth access (SPA), short-lived OTP, device binding, TLS pinning, least privilege.
+	•	User isolation: per-session browser container + random path + cleanup on terminate.
+	•	Operational fit: admin can create users fast, see live sessions, terminate instantly, and get clean audit logs.
+	•	Resilience: if OTP expires or SPA probe fails, the UX explains the issue and suggests a retry without exposing secrets.
+
+⸻
+
+10) Sample payloads (ready to stub/mock)
+	•	/v1/auth/login → { "success": true, "data": { "session_id":"SID123", "requires_2fa":true } }
+	•	/v1/auth/challenge/code → { "code":"834219", "ttl":120 }
+	•	/v1/auth/challenge/verify → { "success": true, "data": { "access_token":"JWT...", "refresh_token":"R...", "expires_in":900 } }
+	•	/v1/client/bootstrap → See §4.
+	•	/v1/agent/user/create → { "ok": true }
+	•	/v1/agent/container/spawn → { "url":"https://gw.example.com/ABCD.../", "port":5801, "container_id":"firefox-5801" }
+	•	/v1/admin/sessions?active=true → [ { "id":"s_456", "user":"keyvan", "state":"connected", ... } ]
+	•	/v1/admin/sessions/:id/terminate → { "terminated": true }
+
+⸻
+
+11) Event log taxonomy (map UI actions → audit events)
+	•	USER_CREATED → on user create
+	•	VPN_USER_CREATED → when Agent provisions VPN user
+	•	DEVICE_BIND_APPROVED → admin approves device fingerprint
+	•	AUTH_LOGIN_SUCCESS, OTP_ISSUED, OTP_VERIFIED → login & 2FA
+	•	CLIENT_PREFLIGHT_OK, BOOTSTRAP_ISSUED → before connection
+	•	SPA_SENT, PORT_PROBE_OPEN, STUNNEL_UP, OPENVPN_CONNECTED, SESSION_CONNECTED → tunnel up
+	•	CONTAINER_SPAWNED → browser container ready
+	•	SESSION_TERMINATED_BY_ADMIN, CONTAINER_REMOVED → admin kill
+	•	CLIENT_LOGOUT → user logout
+
+⸻
+
+Done
+
+This file is designed so Cursor can walk through the process with you and implement/mimic each step quickly — whether by wiring to real components or by stubbing endpoints to validate the UI/UX and control plane.

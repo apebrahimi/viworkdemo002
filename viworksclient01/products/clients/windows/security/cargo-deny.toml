@@ -1,0 +1,178 @@
+[advisories]
+db-path = "~/.cargo/advisory-db"
+db-urls = ["https://github.com/rustsec/advisory-db"]
+vulnerability = "deny"
+unmaintained = "deny"
+unsound = "deny"
+notice = "warn"
+ignore = [
+    # Temporarily ignore specific advisories that need manual review
+    # "RUSTSEC-2024-0413",  # GTK3 unmaintained - will be replaced
+    # "RUSTSEC-2024-0429",  # glib unsound - will be upgraded
+]
+
+[licenses]
+default = "deny"
+copyleft = "deny"
+allow-osi-fsf-free = "both"
+confidence-threshold = 0.9
+unknown = "deny"
+unlicensed = "deny"
+exceptions = [
+    # MIT License - very permissive
+    { allow = ["MIT"] },
+    # Apache 2.0 - very permissive
+    { allow = ["Apache-2.0"] },
+    # BSD licenses - very permissive
+    { allow = ["BSD-2-Clause", "BSD-3-Clause"] },
+    # ISC License - very permissive
+    { allow = ["ISC"] },
+    # CC0 - public domain
+    { allow = ["CC0-1.0"] },
+    # Zlib - very permissive
+    { allow = ["Zlib"] },
+    # Unlicense - public domain
+    { allow = ["Unlicense"] },
+]
+
+[[licenses.exceptions]]
+allow = ["MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "ISC", "CC0-1.0", "Zlib", "Unlicense"]
+when = { workspace = true }
+
+[source]
+# Git repositories to treat as "vendored" sources
+vendored-sources = ["git+https://github.com/viworks/viworks-client"]
+
+[source.registries]
+# Allow crates.io and our private registry
+crates-io = { url = "https://github.com/rust-lang/crates.io-index" }
+viworks = { url = "https://github.com/viworks/crates-index" }
+
+[source.registry-aliases]
+# Map registry names to URLs
+crates-io = "https://github.com/rust-lang/crates.io-index"
+viworks = "https://github.com/viworks/crates-index"
+
+[ban]
+multiple-versions = "deny"
+highlight = ["viworks-core", "viworks-auth-api", "viworks-platform", "viworks-spa-fwknop", "viworks-vpn-openvpn"]
+
+[ban.multiple-versions]
+# Allow multiple versions of these crates
+allow = [
+    # Windows API crates often have multiple versions
+    "windows",
+    "windows-sys",
+    # Serde ecosystem
+    "serde",
+    "serde_json",
+    # Tokio ecosystem
+    "tokio",
+    "tokio-util",
+    # Tracing ecosystem
+    "tracing",
+    "tracing-subscriber",
+    "tracing-appender",
+]
+
+[ban.deny]
+# Explicitly deny certain crates
+name = [
+    # Known malicious crates
+    "rustdecimal",
+    "crate_and_screw",
+    # Outdated crypto libraries
+    "md5",
+    "sha1",
+    # Insecure networking
+    "native-tls",
+    # Known vulnerable crates
+    "time",
+    # Unmaintained crates
+    "gtk",
+    "gtk-sys",
+    "gdk",
+    "gdk-sys",
+    "atk",
+    "atk-sys",
+    "gtk3-macros",
+    "glib",
+    "derivative",
+    "instant",
+    "paste",
+    "proc-macro-error",
+]
+
+[ban.allow]
+# Allow specific versions of denied crates if needed
+name = [
+    # Allow specific versions here if absolutely necessary
+]
+
+[ban.skip]
+# Skip certain crates from multiple version checks
+name = [
+    # Skip these from multiple version checks
+]
+
+[wildcards]
+# Deny wildcard dependencies
+deny = [
+    # Deny all wildcard dependencies
+    "*",
+]
+
+[wildcards.allow]
+# Allow specific wildcard dependencies
+name = [
+    # Allow specific wildcards here if needed
+]
+
+[wildcards.deny]
+# Explicitly deny specific wildcard dependencies
+name = [
+    # Deny specific wildcards here
+]
+
+[wildcards.skip]
+# Skip certain crates from wildcard checks
+name = [
+    # Skip these from wildcard checks
+]
+
+[graph]
+# Graph configuration for dependency analysis
+max-depth = 20
+max-breadth = 20
+
+[graph.allow]
+# Allow specific dependency patterns
+name = [
+    # Allow specific patterns here
+]
+
+[graph.deny]
+# Deny specific dependency patterns
+name = [
+    # Deny specific patterns here
+]
+
+[graph.skip]
+# Skip certain crates from graph analysis
+name = [
+    # Skip these from graph analysis
+]
+
+[metadata]
+# Metadata about this configuration
+authors = ["ViWorkS Security Team"]
+maintainers = ["security@viworks.local"]
+description = "Security configuration for ViWorkS Client"
+license = "Proprietary"
+repository = "https://github.com/viworks/viworks-client"
+homepage = "https://viworks.local"
+documentation = "https://docs.viworks.local"
+readme = "README.md"
+keywords = ["vpn", "security", "windows", "rust"]
+categories = ["security", "network-programming"]
+badges = { maintenance = { status = "actively-developed" } }

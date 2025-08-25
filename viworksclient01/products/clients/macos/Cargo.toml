@@ -1,0 +1,80 @@
+[workspace]
+resolver = "2"
+members = [
+    "apps/desktop_egui",
+    "crates/core",
+    "crates/auth_api",
+    "crates/spa_fwknop",
+    "crates/vpn_openvpn",
+    "crates/platform",
+    "crates/stunnel",
+    "crates/connection_manager",
+]
+
+[workspace.dependencies]
+# Core dependencies
+eframe = "0.26"
+egui = "0.26"
+tokio = { version = "1", features = ["rt-multi-thread", "process", "time", "fs", "net", "macros", "signal"] }
+rfd = "0.13"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "local-time"] }
+tracing-appender = "0.2"
+dirs = "5.0"
+anyhow = "1.0"
+thiserror = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+zeroize = "1.8"
+
+# macOS-specific dependencies
+objc = "0.2"
+cocoa = "0.25"
+core-foundation = "0.9"
+core-graphics = "0.22"
+security-framework = "2.8"
+launchctl = "0.1"
+libc = "0.2"
+
+# Security dependencies
+ring = "0.17"
+base64 = "0.21"
+uuid = { version = "1.0", features = ["v4"] }
+chrono = { version = "0.4", features = ["serde"] }
+lazy_static = "1.4"
+
+# Network and crypto
+reqwest = { version = "0.11", default-features = false, features = ["rustls-tls", "json"] }
+rustls = "0.21"
+rustls-pemfile = "1.0"
+webpki-roots = "0.25"
+sha2 = "0.10"
+regex = "1.0"
+x509-parser = "0.16"
+
+[workspace.package]
+version = "1.0.0"
+edition = "2021"
+authors = ["ViWorkS Team"]
+description = "Secure VPN client with SPA authentication"
+license = "MIT"
+repository = "https://github.com/viworks/client"
+keywords = ["vpn", "security", "spa", "fwknop", "openvpn"]
+categories = ["security", "network-programming"]
+badges = { maintenance = { status = "actively-developed" } }
+
+[profile.dev]
+opt-level = 0
+debug = true
+
+[profile.release]
+opt-level = 3
+debug = false
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[profile.release.package."*"]
+opt-level = 3
+debug = false

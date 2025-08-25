@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Navigation bar style for API 27+ -->
+    <style name="Theme.ViWorks" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <!-- Navigation bar -->
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
+</resources>

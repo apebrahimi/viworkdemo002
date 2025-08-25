@@ -1,0 +1,217 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background"
+    android:fillViewport="true">
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="24dp">
+
+        <!-- Title -->
+        <TextView
+            android:id="@+id/tv_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="32dp"
+            android:text="تنظیمات API"
+            android:textAlignment="center"
+            style="@style/TextAppearance.ViWorks.Title"
+            android:layoutDirection="rtl"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <!-- Current Configuration -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/card_config"
+            style="@style/ViWorksCard"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="32dp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/tv_title">
+
+            <TextView
+                android:id="@+id/tv_current_config"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="در حال بارگذاری..."
+                style="@style/TextAppearance.ViWorks.Body"
+                android:layoutDirection="rtl"
+                android:fontFamily="monospace"
+                android:textSize="12sp" />
+
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Custom URL Section -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/card_custom_url"
+            style="@style/ViWorksCard"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/card_config">
+
+            <TextView
+                android:id="@+id/tv_custom_url_label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="آدرس API سفارشی"
+                style="@style/TextAppearance.ViWorks.Section"
+                android:layoutDirection="rtl"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent" />
+
+            <EditText
+                android:id="@+id/et_custom_url"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:hint="مثال: http://192.168.1.100:8080"
+                android:inputType="textUri"
+                android:textDirection="ltr"
+                android:textAlignment="textStart"
+                style="@style/ViWorksInput"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@+id/tv_custom_url_label" />
+
+            <Button
+                android:id="@+id/btn_save_url"
+                style="@style/ViWorksButton.Primary"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:layout_marginEnd="6dp"
+                android:text="ذخیره"
+                android:layoutDirection="rtl"
+                app:layout_constraintEnd_toStartOf="@+id/btn_clear_url"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@+id/et_custom_url" />
+
+            <Button
+                android:id="@+id/btn_clear_url"
+                style="@style/ViWorksButton.Secondary"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:text="پاک کردن"
+                android:layoutDirection="rtl"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toEndOf="@+id/btn_save_url"
+                app:layout_constraintTop_toTopOf="@+id/btn_save_url" />
+
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Environment Section -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/card_environment"
+            style="@style/ViWorksCard"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/card_custom_url">
+
+            <TextView
+                android:id="@+id/tv_environment_label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="محیط اجرا"
+                style="@style/TextAppearance.ViWorks.Section"
+                android:layoutDirection="rtl"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent" />
+
+            <Button
+                android:id="@+id/btn_set_local"
+                style="@style/ViWorksButton.Secondary"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:layout_marginEnd="6dp"
+                android:text="محلی"
+                android:layoutDirection="rtl"
+                app:layout_constraintEnd_toStartOf="@+id/btn_set_dev"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@+id/tv_environment_label" />
+
+            <Button
+                android:id="@+id/btn_set_dev"
+                style="@style/ViWorksButton.Secondary"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:layout_marginEnd="6dp"
+                android:text="توسعه"
+                android:layoutDirection="rtl"
+                app:layout_constraintEnd_toStartOf="@+id/btn_set_prod"
+                app:layout_constraintStart_toEndOf="@+id/btn_set_local"
+                app:layout_constraintTop_toTopOf="@+id/btn_set_local" />
+
+            <Button
+                android:id="@+id/btn_set_prod"
+                style="@style/ViWorksButton.Secondary"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:text="تولید"
+                android:layoutDirection="rtl"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toEndOf="@+id/btn_set_dev"
+                app:layout_constraintTop_toTopOf="@+id/btn_set_dev" />
+
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Instructions -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/card_instructions"
+            style="@style/ViWorksCard"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/card_environment">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="راهنمای تست با Docker:
+
+1. برای تست روی شبیه‌ساز:
+   آدرس: http://10.0.2.2:8080
+
+2. برای تست روی دستگاه فیزیکی:
+   آدرس: http://[IP-کامپیوتر-شما]:8080
+
+3. برای پیدا کردن IP کامپیوتر:
+   - Windows: ipconfig
+   - Mac/Linux: ifconfig یا ip addr
+
+4. مطمئن شوید که Docker روی پورت 8080 اجرا می‌شود"
+                style="@style/TextAppearance.ViWorks.Body"
+                android:layoutDirection="rtl"
+                android:lineSpacingExtra="4dp" />
+
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Bottom Spacing -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="32dp"
+            app:layout_constraintTop_toBottomOf="@+id/card_instructions" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+</ScrollView>

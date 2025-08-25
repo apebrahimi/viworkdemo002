@@ -1,0 +1,32 @@
+﻿[package]
+name = "viworks-platform"
+version = "1.0.0"
+edition = "2021"
+
+[dependencies]
+# Workspace dependencies
+viworks-core = { path = "../core" }
+tokio = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+sha2 = { workspace = true }
+zeroize = { workspace = true }
+base64 = { workspace = true }
+
+# macOS-specific dependencies
+objc = { workspace = true }
+cocoa = { workspace = true }
+core-foundation = { workspace = true }
+core-graphics = { workspace = true }
+security-framework = { workspace = true }
+launchctl = { workspace = true }
+
+# Additional dependencies
+uuid = { version = "1.0", features = ["v4"] }
+hex = "0.4"
+tracing = { workspace = true }
+tempfile = "3.8"
+
+
+
+

@@ -1,0 +1,18 @@
+﻿[package]
+name = "viworks-connection-manager"
+version = "1.0.0"
+edition = "2021"
+
+[dependencies]
+viworks-core = { path = "../core" }
+viworks-spa-fwknop = { path = "../spa_fwknop" }
+viworks-stunnel = { path = "../stunnel" }
+viworks-vpn-openvpn = { path = "../vpn_openvpn" }
+tokio = { version = "1.0", features = ["full"] }
+tracing = "0.1"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+
+
+

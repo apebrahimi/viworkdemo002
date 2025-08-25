@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- ViWorks UI System v1 - Semantic Color Tokens -->
+    
+    <!-- Primary Actions -->
+    <color name="primary">#1E5EFF</color>           <!-- Primary/Action -->
+    <color name="on_primary">#FFFFFF</color>        <!-- OnPrimary -->
+    
+    <!-- Status Colors -->
+    <color name="success">#10B981</color>           <!-- Success -->
+    <color name="warning">#F59E0B</color>           <!-- Warning -->
+    <color name="error">#EF4444</color>             <!-- Error -->
+    <color name="info">#3B82F6</color>              <!-- Info -->
+    
+    <!-- Light Mode Surfaces -->
+    <color name="background">#F8FAFC</color>        <!-- Background -->
+    <color name="surface">#FFFFFF</color>           <!-- Surface -->
+    <color name="card_border">#E2E8F0</color>       <!-- Card Border -->
+    
+    <!-- Text Colors -->
+    <color name="text_strong">#0F172A</color>       <!-- Text Strong -->
+    <color name="text_muted">#64748B</color>        <!-- Text Muted -->
+    <color name="text_disabled">#94A3B8</color>     <!-- Disabled -->
+    
+    <!-- Dark Mode Surfaces (for future use) -->
+    <color name="background_dark">#0B0F14</color>   <!-- Dark Background -->
+    <color name="card_dark">#10151D</color>         <!-- Dark Card -->
+    <color name="border_dark">#1F2937</color>       <!-- Dark Border -->
+    
+    <!-- Common Colors -->
+    <color name="white">#FFFFFF</color>
+    <color name="black">#000000</color>
+    <color name="transparent">#00000000</color>
+    
+    <!-- Legacy Support (keeping for compatibility) -->
+    <color name="primary_dark">#1E5EFF</color>
+    <color name="primary_light">#1E5EFF</color>
+    <color name="accent">#10B981</color>
+    
+    <!-- Notification Colors -->
+    <color name="notification_color">#1E5EFF</color>
+    
+    <!-- Input Colors -->
+    <color name="input_background">#FFFFFF</color>
+    <color name="input_border">#E2E8F0</color>
+    <color name="input_focused">#1E5EFF</color>
+</resources>

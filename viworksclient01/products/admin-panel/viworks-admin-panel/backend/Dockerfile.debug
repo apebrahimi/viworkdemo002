@@ -1,0 +1,89 @@
+# Debug version of the backend Dockerfile
+FROM rustlang/rust:nightly-slim as builder
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    pkg-config \
+    libssl-dev \
+    libpq-dev \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /app
+
+# Copy dependency files
+COPY Cargo.toml ./
+
+# Create a dummy main.rs to build dependencies
+RUN mkdir src && echo "fn main() {}" > src/main.rs
+
+# Build dependencies (this layer will be cached)
+RUN cargo build --release
+
+# Remove dummy main.rs and copy actual source code
+RUN rm src/main.rs
+COPY src/ ./src/
+
+# Build the application
+RUN cargo build --release
+
+# Runtime stage with debugging tools
+FROM debian:bookworm-slim
+
+# Install runtime dependencies and debugging tools
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    libpq5 \
+    libssl3 \
+    curl \
+    procps \
+    lsof \
+    net-tools \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user
+RUN useradd -r -s /bin/bash app
+
+# Set working directory
+WORKDIR /app
+
+# Copy binary from builder stage
+COPY --from=builder /app/target/release/viworks-admin-backend /app/viworks-admin-backend
+
+# Change ownership to non-root user
+RUN chown -R app:app /app
+
+# Switch to non-root user
+USER app
+
+# Expose port
+EXPOSE 8081
+
+# Debug script to run the application
+RUN echo '#!/bin/bash' > /app/debug.sh && \
+    echo 'set -e' >> /app/debug.sh && \
+    echo 'echo "=== Debug Information ==="' >> /app/debug.sh && \
+    echo 'echo "Current user: $(whoami)"' >> /app/debug.sh && \
+    echo 'echo "Current directory: $(pwd)"' >> /app/debug.sh && \
+    echo 'echo "Binary exists: $(ls -la viworks-admin-backend)"' >> /app/debug.sh && \
+    echo 'echo "Environment variables:"' >> /app/debug.sh && \
+    echo 'env | sort' >> /app/debug.sh && \
+    echo 'echo "=== Testing binary ==="' >> /app/debug.sh && \
+    echo 'if [ -x "./viworks-admin-backend" ]; then' >> /app/debug.sh && \
+    echo '    echo "Binary is executable"' >> /app/debug.sh && \
+    echo 'else' >> /app/debug.sh && \
+    echo '    echo "Binary is NOT executable"' >> /app/debug.sh && \
+    echo '    chmod +x ./viworks-admin-backend' >> /app/debug.sh && \
+    echo '    echo "Made binary executable"' >> /app/debug.sh && \
+    echo 'fi' >> /app/debug.sh && \
+    echo 'echo "=== Starting application ==="' >> /app/debug.sh && \
+    echo 'exec ./viworks-admin-backend' >> /app/debug.sh && \
+    chmod +x /app/debug.sh
+
+# Health check disabled for debugging
+# HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=5 \
+#     CMD curl -f http://localhost:8081/health || exit 1
+
+# Run the debug script
+CMD ["/app/debug.sh"]

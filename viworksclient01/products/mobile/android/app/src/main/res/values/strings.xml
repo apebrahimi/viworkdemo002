@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ViWorks</string>
+    
+    <!-- Login Screen -->
+    <string name="login_title">خوش آمدید</string>
+    <string name="login_subtitle">برای ادامه، وارد حساب کاربری خود شوید</string>
+    <string name="login_username">نام کاربری</string>
+    <string name="login_password">رمز عبور</string>
+    <string name="login_button">ورود</string>
+    <string name="login_sms_button">ورود با پیامک</string>
+    <string name="login_enter_credentials">اطلاعات خود را وارد کنید</string>
+    <string name="login_security_notice">تمام اطلاعات شما با امنیت بالا محافظت می‌شود</string>
+    <string name="login_successful">ورود موفقیت‌آمیز بود</string>
+    <string name="login_failed">خطا در ورود</string>
+    <string name="login_invalid_credentials">نام کاربری یا رمز عبور اشتباه است</string>
+    <string name="login_sms_sent">کد تایید ارسال شد</string>
+    <string name="login_sms_failed">خطا در ارسال کد تایید</string>
+    <string name="login_please_enter_both">لطفاً نام کاربری و رمز عبور را وارد کنید</string>
+    <string name="login_authenticating">در حال احراز هویت...</string>
+    <string name="login_requesting_sms">در حال درخواست کد پیامک...</string>
+    <string name="login_sms_sent_detail">کد تایید را در پیامک‌های خود بررسی کنید</string>
+    <string name="login_sms_permissions_granted">دسترسی‌های پیامک تایید شد</string>
+    <string name="login_sms_permissions_required">دسترسی پیامک برای ورود با پیامک ضروری است</string>
+    
+    <!-- Device Registration -->
+    <string name="device_registration_title">ثبت دستگاه</string>
+    <string name="device_registration_subtitle">برای اولین بار، اطلاعات دستگاه خود را ثبت کنید</string>
+    <string name="device_registration_full_name">نام و نام خانوادگی</string>
+    <string name="device_registration_organization_id">شناسه سازمان</string>
+    <string name="device_registration_device_name">نام دستگاه (اختیاری)</string>
+    <string name="device_registration_register">ثبت دستگاه</string>
+    <string name="device_registration_ready">اطلاعات خود را وارد کنید</string>
+    <string name="device_registration_processing">در حال ثبت دستگاه...</string>
+    <string name="device_registration_success">دستگاه با موفقیت ثبت شد</string>
+    <string name="device_registration_error">خطا در ثبت دستگاه</string>
+    <string name="device_info_placeholder">📱 اطلاعات دستگاه شما</string>
+    
+    <!-- Home Screen -->
+    <string name="home_welcome">خوش آمدید</string>
+    <string name="home_status_ready">آماده برای احراز هویت</string>
+    <string name="home_status_description">دستگاه شما آماده است و می‌توانید درخواست احراز هویت ارسال کنید</string>
+    <string name="home_request_verification">درخواست احراز هویت</string>
+    <string name="home_logout">خروج</string>
+    <string name="home_check_security">بررسی امنیت</string>
+    <string name="home_simulate_request">شبیه‌سازی درخواست</string>
+    <string name="home_permissions_granted">دسترسی‌ها تایید شد</string>
+    <string name="home_permissions_denied">برخی دسترسی‌ها رد شد. عملکرد برنامه ممکن است محدود شود</string>
+    <string name="home_logout_failed">خطا در خروج</string>
+    
+    <!-- Verification Screen -->
+    <string name="verification_title">کد تایید</string>
+    <string name="verification_code_label">کد ۶ رقمی</string>
+    <string name="verification_expires_in">اعتبار: ۲ دقیقه</string>
+    <string name="verification_status_waiting">در انتظار تایید...</string>
+    <string name="verification_status_pending">در حال بررسی...</string>
+    <string name="verification_status_approved">تایید شد</string>
+    <string name="verification_status_rejected">رد شد</string>
+    <string name="verification_approve">تایید</string>
+    <string name="verification_deny">رد</string>
+    <string name="verification_approved_message">درخواست تایید شد</string>
+    <string name="verification_rejected_message">درخواست رد شد</string>
+    <string name="verification_denied_message">درخواست رد شد</string>
+    
+    <!-- Common -->
+    <string name="loading">در حال بارگذاری...</string>
+    <string name="error">خطا</string>
+    <string name="success">موفقیت</string>
+    <string name="cancel">لغو</string>
+    <string name="ok">تایید</string>
+    <string name="retry">تلاش مجدد</string>
+    <string name="info">اطلاعات</string>
+    <string name="warning">هشدار</string>
+</resources>
