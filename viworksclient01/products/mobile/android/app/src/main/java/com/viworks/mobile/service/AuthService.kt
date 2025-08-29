@@ -40,17 +40,42 @@ class AuthService {
                     if (jsonResponse != null) {
                         val success = jsonResponse.optBoolean("success", false)
                         val message = jsonResponse.optString("message", "")
-                        val token = jsonResponse.optString("token", "").takeIf { it.isNotEmpty() }
-                        val userId = jsonResponse.optString("userId", "").takeIf { it.isNotEmpty() }
                         
                         Log.d(TAG, "API login response: success=$success, message=$message")
                         
-                        Result.success(LoginResponse(
-                            success = success,
-                            message = message,
-                            token = token,
-                            userId = userId
-                        ))
+                        if (success) {
+                            // Check if 2FA is required
+                            val data = jsonResponse.optJSONObject("data")
+                            val requires2fa = data?.optBoolean("requires_2fa", false) ?: false
+                            val sessionId = data?.optString("session_id", "") ?: ""
+                            
+                            if (requires2fa) {
+                                Log.d(TAG, "2FA required for session: $sessionId")
+                                // For now, we'll treat this as a successful login
+                                // In a real app, you'd handle 2FA flow
+                                Result.success(LoginResponse(
+                                    success = true,
+                                    message = "Login successful (2FA required)",
+                                    token = sessionId, // Use session_id as token for now
+                                    userId = loginRequest.username
+                                ))
+                            } else {
+                                // No 2FA required
+                                Result.success(LoginResponse(
+                                    success = true,
+                                    message = message,
+                                    token = sessionId,
+                                    userId = loginRequest.username
+                                ))
+                            }
+                        } else {
+                            Result.success(LoginResponse(
+                                success = false,
+                                message = message,
+                                token = null,
+                                userId = null
+                            ))
+                        }
                     } else {
                         Log.w(TAG, "API returned null response, falling back to demo mode")
                         fallbackLogin(loginRequest)
@@ -177,22 +202,15 @@ class AuthService {
     /**
      * Register device
      */
-    suspend fun registerDevice(request: DeviceRegistrationRequest): Result<DeviceRegistrationResponse> {
+    suspend fun registerDevice(request: Map<String, Any?>): Result<DeviceRegistrationResponse> {
         return withContext(Dispatchers.IO) {
             try {
-                Log.d(TAG, "Attempting device registration for user: ${request.fullName}")
+                val userId = request["user_id"] as? String ?: ""
+                val deviceId = request["device_id"] as? String ?: ""
+                Log.d(TAG, "Attempting device registration for user: $userId, device: $deviceId")
                 
                 // Try real API first
-                val apiResult = apiService.registerDevice(
-                    authToken = request.authToken,
-                    fullName = request.fullName,
-                    organizationId = request.organizationId,
-                    deviceName = request.deviceName,
-                    deviceId = request.deviceId,
-                    deviceModel = request.deviceModel,
-                    androidVersion = request.androidVersion,
-                    manufacturer = request.manufacturer
-                )
+                val apiResult = apiService.registerDevice(request)
                 
                 if (apiResult.isSuccess) {
                     val jsonResponse = apiResult.getOrNull()
@@ -205,21 +223,23 @@ class AuthService {
                         Result.success(DeviceRegistrationResponse(
                             success = success,
                             message = message,
-                            deviceId = null,
+                            deviceId = deviceId,
                             registrationToken = null
                         ))
                     } else {
                         Log.w(TAG, "API returned null response, falling back to demo mode")
-                        fallbackDeviceRegistration(request)
+                        fallbackDeviceRegistration(userId, deviceId)
                     }
                 } else {
                     Log.w(TAG, "API device registration failed: ${apiResult.exceptionOrNull()?.message}, falling back to demo mode")
-                    fallbackDeviceRegistration(request)
+                    fallbackDeviceRegistration(userId, deviceId)
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Device registration error", e)
                 Log.w(TAG, "Falling back to demo mode due to error")
-                fallbackDeviceRegistration(request)
+                val userId = request["user_id"] as? String ?: ""
+                val deviceId = request["device_id"] as? String ?: ""
+                fallbackDeviceRegistration(userId, deviceId)
             }
         }
     }
@@ -227,18 +247,18 @@ class AuthService {
     /**
      * Fallback device registration for demo/testing purposes
      */
-    private suspend fun fallbackDeviceRegistration(request: DeviceRegistrationRequest): Result<DeviceRegistrationResponse> {
+    private suspend fun fallbackDeviceRegistration(userId: String, deviceId: String): Result<DeviceRegistrationResponse> {
         return withContext(Dispatchers.IO) {
             try {
                 // Simulate network delay
                 delay(2000)
                 
-                Log.d(TAG, "Demo device registration successful for: ${request.fullName}")
+                Log.d(TAG, "Demo device registration successful for user: $userId, device: $deviceId")
                 
                 Result.success(DeviceRegistrationResponse(
                     success = true,
                     message = "Demo device registration successful",
-                    deviceId = null,
+                    deviceId = deviceId,
                     registrationToken = null
                 ))
             } catch (e: Exception) {

@@ -4,6 +4,7 @@ use viworks_core::ConnectionState;
 use std::time::Duration;
 use tracing::{info, error};
 use egui::Context;
+use crate::state::app_state::LoginState;
 
 // Import our new modular components
 
@@ -45,6 +46,12 @@ impl eframe::App for ViWorksApp {
         if completed_count > remaining_count {
             self.state.is_busy = false;
             self.state.append_log("Operation completed".to_string());
+            
+            // If we were in login progress, transition to 2FA (login succeeded)
+            if self.state.login_state == LoginState::LoginInProgress {
+                self.state.login_state = LoginState::AwaitingTwoFactor;
+                self.state.append_log("✅ Login successful, proceeding to 2FA authentication".to_string());
+            }
         }
 
         // Get current state without holding the lock

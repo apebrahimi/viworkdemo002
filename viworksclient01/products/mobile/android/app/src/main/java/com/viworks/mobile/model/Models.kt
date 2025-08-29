@@ -4,11 +4,17 @@ package com.viworks.mobile.model
  * Represents a verification request from the server
  */
 data class VerificationRequest(
-    val requestId: String,
+    val id: String,
+    val code: String,
+    val deviceId: String,
     val userId: String,
-    val timestamp: Long,
     val ipAddress: String,
-    val deviceInfo: String
+    val locationLat: Double,
+    val locationLng: Double,
+    val createdAt: String,
+    val expiresAt: Long,
+    val completed: Boolean,
+    val approved: Boolean?
 )
 
 /**

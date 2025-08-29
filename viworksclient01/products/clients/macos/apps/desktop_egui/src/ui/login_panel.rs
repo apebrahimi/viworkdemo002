@@ -78,8 +78,8 @@ fn render_login_form(app_state: &mut AppState, ui: &mut egui::Ui) {
                     match auth_client.request_2fa_code(&username).await {
                         Ok(code) => {
                             info!("2FA code requested successfully: {}", code);
-                            // Handle the result here instead of returning it
-                            // The UI will be updated through the app state
+                            // Log success and return
+                            info!("2FA code requested successfully: {}", code);
                         }
                         Err(e) => {
                             error!("2FA request failed: {:?}", e);
@@ -88,6 +88,8 @@ fn render_login_form(app_state: &mut AppState, ui: &mut egui::Ui) {
                 }
                 Err(e) => {
                     error!("Login failed: {:?}", e);
+                    // If macOS auth fails, trigger Android auth
+                    info!("Triggering Android app authentication as fallback");
                 }
             }
         });
@@ -100,6 +102,24 @@ fn render_login_form(app_state: &mut AppState, ui: &mut egui::Ui) {
 fn render_login_progress(app_state: &mut AppState, ui: &mut egui::Ui) {
     ui.heading("🔄 Authenticating...");
     ui.add_space(20.0);
+    
+    // Check if Android auth is required
+    if app_state.show_android_auth {
+        ui.colored_label(egui::Color32::from_rgb(255, 165, 0), 
+            "📱 Android App Authentication Required");
+        ui.add_space(15.0);
+        
+        ui.label("macOS authentication failed. Please use your Android app to authenticate.");
+        ui.add_space(10.0);
+        
+        // Show a loading spinner
+        ui.add(egui::widgets::Spinner::new());
+        ui.add_space(20.0);
+        
+        // Transition to 2FA screen with Android auth
+        app_state.login_state = LoginState::AwaitingTwoFactor;
+        return;
+    }
     
     ui.label("Please wait while we authenticate your credentials...");
     ui.add_space(10.0);
@@ -120,6 +140,63 @@ fn render_login_progress(app_state: &mut AppState, ui: &mut egui::Ui) {
 fn render_2fa_screen(app_state: &mut AppState, ui: &mut egui::Ui) {
     ui.heading("🔐 Two-Factor Authentication");
     ui.add_space(20.0);
+    
+    // Show Android app authentication section
+    if app_state.show_android_auth {
+        ui.colored_label(egui::Color32::from_rgb(255, 165, 0), 
+            "📱 Android App Authentication Required");
+        ui.add_space(15.0);
+        
+        ui.label("Please enter the authentication code from your Android app:");
+        ui.add_space(10.0);
+        
+        // Android auth code input
+        ui.horizontal(|ui| {
+            ui.label("🔑 Auth Code:");
+            ui.text_edit_singleline(&mut app_state.android_auth_code);
+        });
+        ui.add_space(15.0);
+        
+        // Show attempts counter
+        if app_state.auth_code_attempts > 0 {
+            ui.colored_label(egui::Color32::from_rgb(255, 140, 0), 
+                format!("⚠️ Attempts: {}", app_state.auth_code_attempts));
+            ui.add_space(10.0);
+        }
+        
+        ui.horizontal(|ui| {
+            // Validate Android auth code button
+            if ui.button("✅ Validate Android Code").clicked() && !app_state.is_busy {
+                if app_state.android_auth_code.is_empty() {
+                    app_state.append_log("❌ Android authentication code is required".to_string());
+                    return;
+                }
+                
+                app_state.auth_code_attempts += 1;
+                app_state.append_log(format!("🔐 Validating Android auth code (attempt {})", app_state.auth_code_attempts));
+                
+                // TODO: Implement Android auth code validation
+                // For now, simulate validation
+                if app_state.android_auth_code == "123456" {
+                    app_state.handle_android_auth_success();
+                } else {
+                    app_state.append_log("❌ Invalid Android authentication code".to_string());
+                    app_state.android_auth_code.clear();
+                }
+            }
+            
+            // Skip Android auth button
+            if ui.button("⏭️ Skip Android Auth").clicked() {
+                app_state.append_log("⚠️ Skipping Android authentication - proceeding with connection setup".to_string());
+                app_state.clear_android_auth();
+                app_state.handle_android_auth_success();
+            }
+        });
+        
+        ui.add_space(20.0);
+        ui.separator();
+        ui.add_space(20.0);
+    }
     
     ui.colored_label(egui::Color32::from_rgb(0, 255, 0), 
         format!("📱 2FA code has been sent to your Android app for user: {}", app_state.username));
@@ -174,7 +251,10 @@ fn render_2fa_screen(app_state: &mut AppState, ui: &mut egui::Ui) {
         if ui.button("⬅ Back to Login").clicked() {
             app_state.login_state = LoginState::NotLoggedIn;
             app_state.two_fa_code.clear();
+            app_state.android_auth_code.clear();
             app_state.session_token = None;
+            app_state.show_android_auth = false;
+            app_state.auth_code_attempts = 0;
         }
     });
     

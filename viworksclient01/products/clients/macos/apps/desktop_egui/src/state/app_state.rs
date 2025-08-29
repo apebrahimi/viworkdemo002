@@ -9,6 +9,7 @@ use viworks_auth_api::AuthClient;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tracing::{warn, error, info};
+use crate::handlers::logging::LoggingHandler;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum LoginState {
@@ -35,6 +36,11 @@ pub struct AppState {
     pub login_state: LoginState,
     pub two_fa_code: String,
     pub session_token: Option<String>,
+    
+    // Android app authentication
+    pub android_auth_code: String,
+    pub show_android_auth: bool,
+    pub auth_code_attempts: u32,
     
     // Connection form
     pub server_host: String,
@@ -105,6 +111,9 @@ impl AppState {
             login_state: LoginState::NotLoggedIn,
             two_fa_code: String::new(),
             session_token: None,
+            android_auth_code: String::new(),
+            show_android_auth: false,
+            auth_code_attempts: 0,
             server_host: "viworks.ir".to_string(),
             server_port: "8445".to_string(),
             fwknop_key: "test_fwknop_key_12345".to_string(),
@@ -141,5 +150,28 @@ impl AppState {
             auto_logout_timer: Some(Instant::now()),
             pending_tasks: Vec::new(),
         }
+    }
+    
+    // Method to trigger Android authentication
+    pub fn trigger_android_auth(&mut self) {
+        self.show_android_auth = true;
+        self.android_auth_code.clear();
+        self.auth_code_attempts = 0;
+        self.append_log("📱 Android app authentication required".to_string());
+    }
+    
+    // Method to clear Android authentication state
+    pub fn clear_android_auth(&mut self) {
+        self.show_android_auth = false;
+        self.android_auth_code.clear();
+        self.auth_code_attempts = 0;
+    }
+    
+    // Method to handle successful Android authentication
+    pub fn handle_android_auth_success(&mut self) {
+        self.clear_android_auth();
+        self.append_log("✅ Android authentication successful - proceeding to connection setup".to_string());
+        // Transition to logged in state to show connection panel
+        self.login_state = LoginState::LoggedIn;
     }
 }

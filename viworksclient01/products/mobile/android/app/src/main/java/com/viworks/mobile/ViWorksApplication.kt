@@ -2,8 +2,7 @@ package com.viworks.mobile
 
 import android.app.Application
 import android.util.Log
-import com.google.firebase.FirebaseApp
-import com.google.firebase.messaging.FirebaseMessaging
+// Firebase imports disabled for demo
 import com.viworks.mobile.util.Config
 
 class ViWorksApplication : Application() {
@@ -23,31 +22,8 @@ class ViWorksApplication : Application() {
             Log.d(TAG, "onCreate: Configuration initialized")
             Log.d(TAG, "onCreate: Config info: ${Config.getConfigInfo()}")
             
-            // Initialize Firebase
-            Log.d(TAG, "onCreate: Initializing Firebase")
-            FirebaseApp.initializeApp(this)
-            Log.d(TAG, "onCreate: Firebase initialized successfully")
-            
-            // Get FCM token for push notifications
-            Log.d(TAG, "onCreate: Getting FCM token")
-            FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
-                try {
-                    if (!task.isSuccessful) {
-                        Log.w(TAG, "Fetching FCM registration token failed", task.exception)
-                        return@addOnCompleteListener
-                    }
-                    
-                    // Get the token
-                    val token = task.result
-                    
-                    // Log the token (in production, send this to your backend)
-                    Log.d(TAG, "FCM Token: $token")
-                    
-                    // TODO: Send token to backend server
-                } catch (e: Exception) {
-                    Log.e(TAG, "checkFcmToken: Error in completion listener", e)
-                }
-            }
+            // Firebase disabled for demo - using custom backend
+            Log.d(TAG, "onCreate: Firebase disabled for demo")
             
             Log.d(TAG, "onCreate: ViWorksApplication initialized successfully")
             

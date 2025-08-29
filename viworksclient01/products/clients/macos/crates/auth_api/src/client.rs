@@ -2,6 +2,7 @@ use viworks_core::{Result, ViWorksError, LoginRequest, LoginResponse, BootstrapD
 use reqwest::Client;
 use chrono::{Utc, Duration as ChronoDuration};
 use tracing::{info, warn, error};
+use uuid::Uuid;
 
 #[derive(Clone)]
 pub struct AuthClient {
@@ -66,7 +67,11 @@ impl AuthClient {
             })?;
 
         if login_response["success"].as_bool() == Some(true) {
-            if login_response["requires_2fa"].as_bool() == Some(true) {
+            // Check if 2FA is required (it's in the data object)
+            let data = login_response.get("data");
+            let requires_2fa = data.and_then(|d| d["requires_2fa"].as_bool()).unwrap_or(false);
+            
+            if requires_2fa {
                 info!("Login successful for user: {}, 2FA required", request.username);
                 
                 // For compatibility with the existing flow, return mock tokens
@@ -90,10 +95,21 @@ impl AuthClient {
     pub async fn request_2fa_code(&self, username: &str) -> Result<String> {
         info!("Requesting 2FA code for user: {}", username);
         
-        let url = format!("{}/api/v1/auth/request-2fa", self.base_url);
+        let url = format!("{}/api/v1/auth/verification-code", self.base_url);
         
         let request = serde_json::json!({
-            "username": username
+            "request_id": format!("mac_request_{}", uuid::Uuid::new_v4().to_string().split('-').next().unwrap()),
+            "device_id": "macos_client",
+            "location": {
+                "latitude": 37.7749,
+                "longitude": -122.4194
+            },
+            "network_info": {
+                "ip": "192.168.1.100",
+                "carrier": null,
+                "network_type": "WiFi"
+            },
+            "device_integrity_token": null
         });
         
         let response = self.client
@@ -473,6 +489,6 @@ pub struct Device {
 
 impl Default for AuthClient {
     fn default() -> Self {
-        Self::new("http://localhost:8080".to_string()).unwrap()
+        Self::new("https://walrus-app-5hly8.ondigitalocean.app".to_string()).unwrap()
     }
 }

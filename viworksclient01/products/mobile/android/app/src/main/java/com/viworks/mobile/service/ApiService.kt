@@ -36,14 +36,14 @@ class ApiService {
             .readTimeout(30, TimeUnit.SECONDS)
             .writeTimeout(30, TimeUnit.SECONDS)
         
-        // Only use certificate pinning for production
-        if (Config.getEnvironment() == Config.ENV_PRODUCTION) {
-            builder.certificatePinner(
-                CertificatePinner.Builder()
-                    .add("api.viworks.com", "sha256/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=")
-                    .build()
-            )
-        }
+        // Certificate pinning disabled for now - using standard SSL validation
+        // if (Config.getEnvironment() == Config.ENV_PRODUCTION) {
+        //     builder.certificatePinner(
+        //         CertificatePinner.Builder()
+        //             .add("walrus-app-5hly8.ondigitalocean.app", "sha256/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=")
+        //             .build()
+        //     )
+        // }
         
         builder.build()
     }
@@ -164,7 +164,71 @@ class ApiService {
     }
     
     /**
-     * Register device with the server
+     * Register device with the server (new format)
+     */
+    suspend fun registerDevice(request: Map<String, Any?>): Result<JSONObject> {
+        return withContext(Dispatchers.IO) {
+            try {
+                val jsonBody = JSONObject()
+                
+                // Add all fields from the request map
+                request.forEach { (key, value) ->
+                    when (value) {
+                        is String -> jsonBody.put(key, value)
+                        is Boolean -> jsonBody.put(key, value)
+                        is Int -> jsonBody.put(key, value)
+                        is Long -> jsonBody.put(key, value)
+                        is Double -> jsonBody.put(key, value)
+                        is Map<*, *> -> {
+                            val nestedJson = JSONObject()
+                            (value as Map<String, Any>).forEach { (nestedKey, nestedValue) ->
+                                nestedJson.put(nestedKey, nestedValue.toString())
+                            }
+                            jsonBody.put(key, nestedJson)
+                        }
+                        null -> jsonBody.put(key, JSONObject.NULL)
+                        else -> jsonBody.put(key, value.toString())
+                    }
+                }
+                
+                val requestBody = jsonBody.toString()
+                    .toRequestBody("application/json".toMediaType())
+                
+                val request = Request.Builder()
+                    .url("${getBaseUrl()}$AUTH_ENDPOINT/register-device")
+                    .post(requestBody)
+                    .addHeader("Content-Type", "application/json")
+                    .build()
+                
+                Log.d(TAG, "Making device registration request to: ${request.url}")
+                Log.d(TAG, "Request body: $requestBody")
+                
+                val response = client.newCall(request).execute()
+                
+                if (response.isSuccessful) {
+                    val responseBody = response.body?.string()
+                    Log.d(TAG, "Device registration response: $responseBody")
+                    
+                    if (!responseBody.isNullOrEmpty()) {
+                        val jsonResponse = JSONObject(responseBody)
+                        Result.success(jsonResponse)
+                    } else {
+                        Result.failure(IOException("Empty response body"))
+                    }
+                } else {
+                    val errorBody = response.body?.string()
+                    Log.e(TAG, "Device registration failed: ${response.code} - $errorBody")
+                    Result.failure(IOException("Device registration failed: ${response.code}"))
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Exception during device registration", e)
+                Result.failure(e)
+            }
+        }
+    }
+    
+    /**
+     * Register device with the server (legacy format)
      */
     suspend fun registerDevice(userId: String, deviceId: String, fcmToken: String?, deviceInfo: Map<String, String>): Result<Boolean> {
         return withContext(Dispatchers.IO) {
@@ -383,6 +447,75 @@ class ApiService {
                 } else {
                     val errorBody = response.body?.string()
                     Log.e(TAG, "Error confirming verification: ${response.code} - $errorBody")
+                    Result.failure(IOException("API error: ${response.code}"))
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Exception during API call", e)
+                Result.failure(e)
+            }
+        }
+    }
+    
+    /**
+     * Get verification requests from admin endpoint
+     */
+    suspend fun getVerificationRequests(): Result<List<VerificationRequest>> {
+        return withContext(Dispatchers.IO) {
+            try {
+                val request = Request.Builder()
+                    .url("${getBaseUrl()}$ADMIN_ENDPOINT/verification-requests")
+                    .get()
+                    .addHeader("Content-Type", "application/json")
+                    .build()
+                
+                Log.d(TAG, "Making verification requests request to: ${request.url}")
+                
+                val response = client.newCall(request).execute()
+                
+                if (response.isSuccessful) {
+                    val responseBody = response.body?.string()
+                    Log.d(TAG, "Verification requests response: $responseBody")
+                    
+                    if (!responseBody.isNullOrEmpty()) {
+                        val jsonResponse = JSONObject(responseBody)
+                        val success = jsonResponse.optBoolean("success", false)
+                        
+                        if (success) {
+                            val requestsArray = jsonResponse.optJSONArray("requests")
+                            val requests = mutableListOf<VerificationRequest>()
+                            
+                            if (requestsArray != null) {
+                                for (i in 0 until requestsArray.length()) {
+                                    val requestObj = requestsArray.getJSONObject(i)
+                                    val verificationRequest = VerificationRequest(
+                                        id = requestObj.optString("id"),
+                                        code = requestObj.optString("code"),
+                                        deviceId = requestObj.optString("device_id"),
+                                        userId = requestObj.optString("user_id"),
+                                        ipAddress = requestObj.optString("ip_address"),
+                                        locationLat = requestObj.optDouble("location_lat"),
+                                        locationLng = requestObj.optDouble("location_lng"),
+                                        createdAt = requestObj.optString("created_at"),
+                                        expiresAt = requestObj.optLong("expires_at"),
+                                        completed = requestObj.optBoolean("completed"),
+                                        approved = if (requestObj.has("approved")) requestObj.optBoolean("approved") else null
+                                    )
+                                    requests.add(verificationRequest)
+                                }
+                            }
+                            
+                            Log.d(TAG, "Retrieved ${requests.size} verification requests")
+                            Result.success(requests)
+                        } else {
+                            val message = jsonResponse.optString("message", "Unknown error")
+                            Result.failure(IOException("API error: $message"))
+                        }
+                    } else {
+                        Result.failure(IOException("Empty response body"))
+                    }
+                } else {
+                    val errorBody = response.body?.string()
+                    Log.e(TAG, "Error getting verification requests: ${response.code} - $errorBody")
                     Result.failure(IOException("API error: ${response.code}"))
                 }
             } catch (e: Exception) {

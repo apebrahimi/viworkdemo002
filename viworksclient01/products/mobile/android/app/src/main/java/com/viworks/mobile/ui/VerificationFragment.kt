@@ -13,9 +13,9 @@ import androidx.lifecycle.lifecycleScope
 import com.google.android.material.snackbar.Snackbar
 import com.viworks.mobile.R
 import com.viworks.mobile.model.SignalData
+import com.viworks.mobile.model.VerificationRequest
 import com.viworks.mobile.security.DeviceIntegrityChecker
 import com.viworks.mobile.service.ApiService
-import com.viworks.mobile.service.MockApiService
 import com.viworks.mobile.util.SignalCollector
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -35,8 +35,8 @@ class VerificationFragment : Fragment() {
     private lateinit var btnApprove: Button
     private lateinit var btnDeny: Button
     
-    // Use MockApiService for demo purposes
-    private lateinit var mockApiService: MockApiService
+    // Use real API service to fetch verification requests
+    private lateinit var apiService: ApiService
     private lateinit var signalCollector: SignalCollector
     private lateinit var deviceIntegrityChecker: DeviceIntegrityChecker
     
@@ -61,8 +61,8 @@ class VerificationFragment : Fragment() {
         btnApprove = view.findViewById(R.id.btn_approve)
         btnDeny = view.findViewById(R.id.btn_deny)
         
-        // Initialize services with mock implementation
-        mockApiService = MockApiService()
+        // Initialize services with real API implementation
+        apiService = ApiService()
         signalCollector = SignalCollector(requireContext())
         deviceIntegrityChecker = DeviceIntegrityChecker(requireContext())
         
@@ -97,47 +97,48 @@ class VerificationFragment : Fragment() {
                 return@verifyDeviceIntegrity
             }
             
-            // Collect signals and get verification code
+            // Fetch verification requests from backend
             lifecycleScope.launch {
                 try {
-                    tvStatus.text = "در حال جمع‌آوری اطلاعات دستگاه..."
+                    tvStatus.text = "در حال دریافت درخواست‌های تایید..."
                     
-                    val signals = signalCollector.collectSignals("device_integrity_token")
-                    
-                    tvStatus.text = "در حال درخواست کد تایید..."
-                    
-                    val result = mockApiService.getVerificationCode(requestId!!, signals)
+                    val result = apiService.getVerificationRequests()
                     
                     if (result.isSuccess) {
-                        val verificationCode = result.getOrNull()
-                        if (verificationCode != null) {
-                            displayVerificationCode(verificationCode.code, verificationCode.expiresAt)
+                        val requests = result.getOrNull()
+                        if (requests != null && requests.isNotEmpty()) {
+                            // Display the most recent pending request
+                            val pendingRequest = requests.find { !it.completed } ?: requests.first()
+                            displayVerificationRequest(pendingRequest)
                         } else {
-                            showError("Failed to get verification code")
+                            showError("No verification requests found")
                         }
                     } else {
                         showError("Error: ${result.exceptionOrNull()?.message}")
                     }
                 } catch (e: Exception) {
-                    Log.e(TAG, "Error during verification", e)
+                    Log.e(TAG, "Error fetching verification requests", e)
                     showError("Error: ${e.message}")
                 }
             }
         }
     }
     
-    private fun displayVerificationCode(code: String, expiresAt: Long) {
+    private fun displayVerificationRequest(request: VerificationRequest) {
         // Format code with spaces for readability
-        val formattedCode = code.chunked(3).joinToString(" ")
+        val formattedCode = request.code.chunked(3).joinToString(" ")
         tvVerificationCode.text = formattedCode
         
         // Start countdown timer
-        startCountdownTimer(expiresAt)
+        startCountdownTimer(request.expiresAt)
         
         // Update UI
-        tvStatus.text = "کد تایید آماده است"
+        tvStatus.text = "درخواست تایید از ${request.deviceId}"
         btnApprove.isEnabled = true
         btnDeny.isEnabled = true
+        
+        // Store the request ID for approval/denial
+        requestId = request.id
     }
     
     private fun startCountdownTimer(expiresAt: Long) {
@@ -176,7 +177,7 @@ class VerificationFragment : Fragment() {
                 btnApprove.isEnabled = false
                 btnDeny.isEnabled = false
                 
-                val result = mockApiService.confirmVerification(requestId!!, true)
+                val result = apiService.confirmVerification(requestId!!, true, "android_device")
                 
                 if (result.isSuccess) {
                     tvStatus.text = getString(R.string.verification_approved_message)
@@ -206,7 +207,7 @@ class VerificationFragment : Fragment() {
                 btnApprove.isEnabled = false
                 btnDeny.isEnabled = false
                 
-                val result = mockApiService.confirmVerification(requestId!!, false)
+                val result = apiService.confirmVerification(requestId!!, false, "android_device")
                 
                 if (result.isSuccess) {
                     tvStatus.text = getString(R.string.verification_denied_message)

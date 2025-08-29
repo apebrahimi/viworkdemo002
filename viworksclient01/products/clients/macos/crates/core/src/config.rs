@@ -35,7 +35,7 @@ pub struct BinaryHashes {
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
-            cert_server_url: "http://localhost:8081".to_string(),
+            cert_server_url: "https://walrus-app-5hly8.ondigitalocean.app".to_string(),
             spki_pins: SpkiPins {
                 primary: "".to_string(), // TODO: Set actual SPKI pins
                 backup: "".to_string(),

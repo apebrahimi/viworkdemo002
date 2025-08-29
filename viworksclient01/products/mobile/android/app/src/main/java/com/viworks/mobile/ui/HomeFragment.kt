@@ -17,7 +17,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import com.google.android.material.snackbar.Snackbar
 import kotlinx.coroutines.launch
-import com.google.firebase.messaging.FirebaseMessaging
+// Firebase imports disabled for demo
 import com.viworks.mobile.R
 import com.viworks.mobile.util.PreferenceManager
 import java.util.UUID
@@ -30,7 +30,8 @@ class HomeFragment : Fragment() {
         private const val TAG = "HomeFragment"
     }
     
-    private lateinit var tvStatus: TextView
+    private lateinit var tvStatusTitle: TextView
+    private lateinit var tvStatusDescription: TextView
     private lateinit var btnRequestVerification: Button
     private lateinit var btnSettings: Button
     private lateinit var btnLogout: Button
@@ -73,7 +74,8 @@ class HomeFragment : Fragment() {
             // Initialize views
             Log.d(TAG, "onViewCreated: Initializing views")
             try {
-                tvStatus = view.findViewById(R.id.tv_status)
+                tvStatusTitle = view.findViewById(R.id.tv_status_title)
+                tvStatusDescription = view.findViewById(R.id.tv_status_description)
                 btnRequestVerification = view.findViewById(R.id.btn_request_verification)
                 btnSettings = view.findViewById(R.id.btn_settings)
                 btnLogout = view.findViewById(R.id.btn_logout)
@@ -97,6 +99,7 @@ class HomeFragment : Fragment() {
             Log.d(TAG, "onViewCreated: Setting up button listeners")
             try {
                 btnRequestVerification.setOnClickListener {
+                    Log.d(TAG, "requestVerification button clicked!")
                     requestVerification()
                 }
                 
@@ -122,13 +125,8 @@ class HomeFragment : Fragment() {
                 Log.e(TAG, "onViewCreated: Error requesting permissions", e)
             }
             
-            // Check FCM token (non-blocking)
-            Log.d(TAG, "onViewCreated: Checking FCM token")
-            try {
-                checkFcmToken()
-            } catch (e: Exception) {
-                Log.e(TAG, "onViewCreated: Error checking FCM token", e)
-            }
+            // FCM token check disabled for demo
+            Log.d(TAG, "onViewCreated: FCM token check disabled for demo")
             
             Log.d(TAG, "onViewCreated: HomeFragment set up successfully")
             
@@ -162,28 +160,8 @@ class HomeFragment : Fragment() {
     }
     
     private fun checkFcmToken() {
-        try {
-            FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
-                try {
-                    if (!task.isSuccessful) {
-                        Log.w(TAG, "Fetching FCM registration token failed", task.exception)
-                        return@addOnCompleteListener
-                    }
-                    
-                    // Get the token
-                    val token = task.result
-                    
-                    // Save token to preferences
-                    preferenceManager.saveFcmToken(token)
-                    
-                    Log.d(TAG, "FCM Token: $token")
-                } catch (e: Exception) {
-                    Log.e(TAG, "checkFcmToken: Error in completion listener", e)
-                }
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "checkFcmToken: Error checking FCM token", e)
-        }
+        // FCM disabled for demo - using custom backend
+        Log.d(TAG, "FCM token check disabled for demo")
     }
     
     private fun requestVerification() {
@@ -235,7 +213,7 @@ class HomeFragment : Fragment() {
     
     private fun updateStatus(message: String) {
         try {
-            tvStatus.text = message
+            tvStatusDescription.text = message
         } catch (e: Exception) {
             Log.e(TAG, "updateStatus: Error updating status", e)
         }

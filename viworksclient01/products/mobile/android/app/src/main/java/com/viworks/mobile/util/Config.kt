@@ -21,7 +21,7 @@ object Config {
     private const val DEFAULT_LOCAL_URL = "http://10.0.2.2:8081" // Android emulator localhost
     private const val DEFAULT_LOCAL_DEVICE_URL = "http://192.168.1.100:8081" // Common local IP
     private const val DEFAULT_DEV_URL = "https://dev-api.viworks.com"
-    private const val DEFAULT_PROD_URL = "https://api.viworks.com"
+    private const val DEFAULT_PROD_URL = "https://walrus-app-5hly8.ondigitalocean.app"
     
     private var prefs: SharedPreferences? = null
     
@@ -63,7 +63,7 @@ object Config {
      * Get the current environment
      */
     fun getEnvironment(): String {
-        return prefs?.getString(KEY_ENVIRONMENT, ENV_LOCAL) ?: ENV_LOCAL
+        return prefs?.getString(KEY_ENVIRONMENT, ENV_PRODUCTION) ?: ENV_PRODUCTION
     }
     
     /**

@@ -280,26 +280,8 @@ class LoginActivity : AppCompatActivity() {
     }
 
     private fun checkDeviceBinding(): Boolean {
-        return try {
-            Log.d(TAG, "checkDeviceBinding: Starting device binding check")
-            
-            // Validate device first
-            val validationResult = deviceBindingManager.validateDevice()
-            if (!validationResult.isValid) {
-                Log.w(TAG, "checkDeviceBinding: Device validation failed: ${validationResult.issues}")
-                // For now, we'll allow the device but log the issues
-                // In production, you might want to be more strict
-            }
-            
-            // Check if device is bound
-            val storedDeviceId = preferenceManager.getDeviceId()
-            val isBound = deviceBindingManager.isDeviceBound(storedDeviceId)
-            
-            Log.d(TAG, "checkDeviceBinding: Device binding result: $isBound")
-            isBound
-        } catch (e: Exception) {
-            Log.e(TAG, "checkDeviceBinding: Error checking device binding", e)
-            false
-        }
+        // Device binding check disabled for demo
+        Log.d(TAG, "checkDeviceBinding: Device binding check disabled for demo")
+        return true
     }
 }

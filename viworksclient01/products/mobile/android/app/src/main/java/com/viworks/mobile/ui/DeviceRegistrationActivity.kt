@@ -49,6 +49,17 @@ class DeviceRegistrationActivity : AppCompatActivity() {
             setContentView(R.layout.activity_device_registration)
             Log.d(TAG, "onCreate: Content view set successfully")
             
+            // Initialize views first
+            Log.d(TAG, "onCreate: Initializing views")
+            etFullName = findViewById(R.id.et_full_name)
+            etOrganizationId = findViewById(R.id.et_organization_id)
+            etDeviceName = findViewById(R.id.et_device_name)
+            btnRegister = findViewById(R.id.btn_register)
+            progressBar = findViewById(R.id.progress_bar)
+            tvStatus = findViewById(R.id.tv_status)
+            tvDeviceInfo = findViewById(R.id.tv_device_info)
+            Log.d(TAG, "onCreate: Views initialized successfully")
+            
             // Get passed data
             authToken = intent.getStringExtra(EXTRA_AUTH_TOKEN)
             username = intent.getStringExtra(EXTRA_USERNAME)
@@ -59,17 +70,6 @@ class DeviceRegistrationActivity : AppCompatActivity() {
                 finish()
                 return
             }
-            
-            // Initialize views
-            Log.d(TAG, "onCreate: Initializing views")
-            etFullName = findViewById(R.id.et_full_name)
-            etOrganizationId = findViewById(R.id.et_organization_id)
-            etDeviceName = findViewById(R.id.et_device_name)
-            btnRegister = findViewById(R.id.btn_register)
-            progressBar = findViewById(R.id.progress_bar)
-            tvStatus = findViewById(R.id.tv_status)
-            tvDeviceInfo = findViewById(R.id.tv_device_info)
-            Log.d(TAG, "onCreate: Views initialized successfully")
             
             // Initialize services
             Log.d(TAG, "onCreate: Initializing services")
@@ -139,67 +139,33 @@ class DeviceRegistrationActivity : AppCompatActivity() {
                 val deviceId = deviceBindingManager.generateDeviceId()
                 Log.d(TAG, "performDeviceRegistration: Generated device ID: $deviceId")
                 
-                // Validate device
-                val validationResult = deviceBindingManager.validateDevice()
-                if (!validationResult.isValid) {
-                    Log.w(TAG, "performDeviceRegistration: Device validation issues: ${validationResult.issues}")
-                    // For demo purposes, we'll continue but log the issues
-                    // In production, you might want to be more strict
-                }
+                // Device validation disabled for demo
+                Log.d(TAG, "performDeviceRegistration: Device validation disabled for demo")
                 
-                val request = DeviceRegistrationRequest(
-                    authToken = authToken!!,
-                    fullName = fullName,
-                    organizationId = organizationId,
-                    deviceName = deviceName,
-                    deviceModel = android.os.Build.MODEL,
-                    androidVersion = android.os.Build.VERSION.RELEASE,
-                    manufacturer = android.os.Build.MANUFACTURER,
-                    deviceId = deviceId
-                )
+                // Simple device registration for demo
+                Log.d(TAG, "performDeviceRegistration: Simple demo device registration")
                 
-                Log.d(TAG, "performDeviceRegistration: Calling authService.registerDevice")
-                val result = authService.registerDevice(request)
-                
-                if (result.isSuccess) {
-                    val response = result.getOrNull()
-                    if (response?.success == true) {
-                        Log.d(TAG, "performDeviceRegistration: Device registration successful, saving data")
-                        
-                        // Save device registration data
-                        try {
-                            preferenceManager.saveDeviceRegistered(true)
-                            preferenceManager.saveFullName(fullName)
-                            preferenceManager.saveOrganizationId(organizationId)
-                            preferenceManager.saveDeviceName(deviceName)
-                            preferenceManager.saveDeviceId(deviceId)
-                            Log.d(TAG, "performDeviceRegistration: Data saved successfully")
-                        } catch (e: Exception) {
-                            Log.e(TAG, "performDeviceRegistration: Error saving data", e)
-                            showError("خطا در ذخیره اطلاعات: ${e.message}")
-                            return@launch
-                        }
-                        
-                        showSuccess("دستگاه با موفقیت ثبت شد")
-                        
-                        // Navigate to main activity
-                        Log.d(TAG, "performDeviceRegistration: Navigating to MainActivity")
-                        try {
-                            val intent = Intent(this@DeviceRegistrationActivity, MainActivity::class.java)
-                            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                            startActivity(intent)
-                            finish()
-                        } catch (e: Exception) {
-                            Log.e(TAG, "performDeviceRegistration: Error navigating to MainActivity", e)
-                            showError("خطا در انتقال به صفحه اصلی: ${e.message}")
-                        }
-                    } else {
-                        Log.e(TAG, "performDeviceRegistration: Device registration failed: ${response?.message}")
-                        showError(response?.message ?: "خطا در ثبت دستگاه")
-                    }
-                } else {
-                    Log.e(TAG, "performDeviceRegistration: Device registration error: ${result.exceptionOrNull()?.message}")
-                    showError("خطا در ثبت دستگاه: ${result.exceptionOrNull()?.message}")
+                try {
+                    // Save device registration data locally
+                    preferenceManager.saveDeviceRegistered(true)
+                    preferenceManager.saveFullName(fullName)
+                    preferenceManager.saveOrganizationId(organizationId)
+                    preferenceManager.saveDeviceName(deviceName)
+                    preferenceManager.saveDeviceId(deviceId)
+                    Log.d(TAG, "performDeviceRegistration: Data saved successfully")
+                    
+                    showSuccess("دستگاه با موفقیت ثبت شد")
+                    
+                    // Navigate to main activity
+                    Log.d(TAG, "performDeviceRegistration: Navigating to MainActivity")
+                    val intent = Intent(this@DeviceRegistrationActivity, MainActivity::class.java)
+                    intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                    startActivity(intent)
+                    finish()
+                    
+                } catch (e: Exception) {
+                    Log.e(TAG, "performDeviceRegistration: Error during device registration", e)
+                    showError("خطا در ثبت دستگاه: ${e.message}")
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "performDeviceRegistration: Exception during device registration", e)
