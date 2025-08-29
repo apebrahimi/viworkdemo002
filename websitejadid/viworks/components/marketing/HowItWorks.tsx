@@ -8,36 +8,38 @@ const steps = [
   {
     step: '01',
     title: 'شروع اتصال',
-    description: 'کاربر روی کامپیوتر خود برنامه ViWorkS را باز می‌کند و درخواست اتصال می‌دهد. سیستم به طور خودکار بررسی می‌کند که آیا شرایط امنیتی لازم برقرار است یا نه.',
+    description: 'کاربر با اجرای کلاینت اختصاصی ViWorkS درخواست اتصال را آغاز می‌کند. سیستم به صورت خودکار پیش‌نیازهای امنیتی را بررسی و تأیید می‌نماید.',
     icon: Smartphone,
-    features: ['باز کردن برنامه ViWorkS', 'درخواست اتصال', 'بررسی خودکار شرایط امنیتی'],
   },
   {
     step: '02',
     title: 'احراز هویت',
-    description: 'کاربر باید با اپلیکیشن موبایل ViWorkS خود را تأیید کند. این کار مثل ورود به بانک با رمز و پیامک تأیید است.',
+    description: 'احراز هویت دو مرحله‌ای از طریق اپلیکیشن موبایل ViWorkS انجام می‌شود که امنیت بالایی را تضمین می‌کند.',
     icon: Shield,
-    features: ['تأیید با اپلیکیشن موبایل', 'احراز هویت دو مرحله‌ای', 'امنیت بالا'],
   },
   {
     step: '03',
     title: 'محیط کاری امن',
-    description: 'پس از تأیید، کاربر وارد یک محیط کاری مجازی می‌شود که کاملاً جدا از کامپیوتر شخصی اوست. مثل این است که روی یک کامپیوتر جدید کار می‌کند.',
+    description: 'پس از احراز هویت، کاربر وارد محیط کاری مجازی می‌شود که کاملاً از سیستم شخصی وی جدا بوده و دسترسی محدود به منابع مجاز دارد.',
     icon: Server,
-    features: ['محیط کاری مجازی', 'جدا از کامپیوتر شخصی', 'دسترسی به برنامه‌های مجاز'],
   },
   {
     step: '04',
     title: 'نظارت و کنترل',
-    description: 'تمام کارهایی که کاربر انجام می‌دهد ثبت می‌شود و مدیران می‌توانند آن‌ها را ببینند. هیچ فایلی روی کامپیوتر شخصی کاربر باقی نمی‌ماند.',
+    description: 'تمام فعالیت‌های کاربر ثبت و قابل نظارت است. هیچ داده‌ای روی دستگاه شخصی کاربر باقی نمی‌ماند و امنیت کامل تضمین می‌شود.',
     icon: Lock,
-    features: ['ثبت تمام فعالیت‌ها', 'نظارت مدیران', 'عدم ذخیره فایل شخصی'],
   },
 ];
 
 export function HowItWorks() {
   return (
-    <section className="py-16 bg-slate-900">
+    <section className="py-20 bg-slate-900 relative overflow-hidden">
+      {/* Background Pattern */}
+      <div className="absolute inset-0 opacity-35">
+        <div className="absolute inset-0" style={{
+          backgroundImage: `url("data:image/svg+xml,%3Csvg width='80' height='80' viewBox='0 0 80 80' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3Cpattern id='howitworks-pattern' x='0' y='0' width='40' height='40' patternUnits='userSpaceOnUse'%3E%3Cpath d='M0 20h40M20 0v40' stroke='%23ffffff' stroke-width='1' stroke-opacity='0.25'/%3E%3C/pattern%3E%3C/defs%3E%3Crect width='80' height='80' fill='url(%23howitworks-pattern)'/%3E%3C/svg%3E")`
+        }} />
+      </div>
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-7xl">
           {/* Section Header */}
@@ -69,22 +71,13 @@ export function HowItWorks() {
                       <div className="p-2 rounded-lg bg-blue-600">
                         <step.icon className="h-5 w-5 text-white" />
                       </div>
-                      <CardTitle className="text-lg font-bold text-white">{step.title}</CardTitle>
+                      <CardTitle className="text-lg font-bold text-black">{step.title}</CardTitle>
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <CardDescription className="text-slate-300 mb-4">
+                    <CardDescription className="text-black">
                       {step.description}
                     </CardDescription>
-                    
-                    <ul className="space-y-2">
-                      {step.features.map((feature, featureIndex) => (
-                        <li key={featureIndex} className="flex items-center space-x-2 text-sm text-slate-300">
-                          <CheckCircle className="w-3 h-3 text-green-400 flex-shrink-0" />
-                          <span>{feature}</span>
-                        </li>
-                      ))}
-                    </ul>
                   </CardContent>
                 </Card>
               </div>

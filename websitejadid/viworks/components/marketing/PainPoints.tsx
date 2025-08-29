@@ -19,6 +19,8 @@ import {
   FileText,
   Target
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import Link from 'next/link';
 
 const securityChallenges = [
   {
@@ -95,8 +97,12 @@ const businessImpact = [
 ];
 
 export function PainPoints() {
+  const handleCtaClick = (type: 'demo' | 'solution') => {
+    // Analytics tracking can be implemented here if needed
+  };
+
   return (
-    <section className="py-16 lg:py-20 bg-white">
+    <section className="py-16 lg:py-20 bg-blue-50">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-7xl">
           {/* Section Header */}
@@ -202,13 +208,17 @@ export function PainPoints() {
               <p className="text-slate-300 mb-6 max-w-2xl mx-auto">
                 ViWorkS با طراحی بر پایه Zero Trust و عدم افشای سرویس‌ها (ZTN)، این چالش‌ها را حل می‌کند
               </p>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <button className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-all duration-300">
-                  مشاهده راه‌حل
-                </button>
-                <button className="border-2 border-white text-white hover:bg-white hover:text-slate-900 px-6 py-3 rounded-lg font-semibold transition-all duration-300">
-                  مشاوره رایگان
-                </button>
+              {/* CTA Buttons */}
+              <div className="flex flex-col sm:flex-row gap-4 mt-8">
+                <Button 
+                  size="lg" 
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
+                  asChild
+                >
+                  <Link href="/contact?type=demo" onClick={() => handleCtaClick('demo')}>
+                    مشاوره و دمو
+                  </Link>
+                </Button>
               </div>
             </div>
           </motion.div>

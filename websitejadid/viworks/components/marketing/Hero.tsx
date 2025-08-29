@@ -23,17 +23,17 @@ export function Hero() {
   };
 
   return (
-    <section className="relative py-16 lg:py-20 flex items-center overflow-hidden bg-slate-900 min-h-screen">
+    <section className="relative pt-2 lg:pt-6 pb-16 lg:pb-20 flex items-center overflow-hidden bg-slate-900 min-h-[80vh]">
       {/* Professional Background Pattern */}
       <div className="absolute inset-0">
         <div className="absolute inset-0 bg-blue-600/5" />
         <div className="absolute inset-0 bg-purple-600/5" />
       </div>
       
-      {/* Subtle Grid Pattern */}
-      <div className="absolute inset-0 opacity-10">
+      {/* Unique Texture Pattern */}
+      <div className="absolute inset-0 opacity-40">
         <div className="absolute inset-0" style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Ccircle cx='30' cy='30' r='1'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
+          backgroundImage: `url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3Cpattern id='hero-pattern' x='0' y='0' width='20' height='20' patternUnits='userSpaceOnUse'%3E%3Ccircle cx='10' cy='10' r='1.5' fill='%23ffffff' fill-opacity='0.3'/%3E%3C/pattern%3E%3C/defs%3E%3Crect width='100' height='100' fill='url(%23hero-pattern)'/%3E%3C/svg%3E")`
         }} />
       </div>
 
@@ -111,33 +111,18 @@ export function Hero() {
               ))}
             </motion.div>
 
-            {/* CTAs */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.8 }}
-              className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start"
-            >
-              <ModernButton
+            {/* CTA Buttons */}
+            <div className="flex flex-col sm:flex-row gap-4 mt-8">
+              <ModernButton 
                 href="/contact?type=demo"
                 variant="primary"
                 size="lg"
                 onClick={() => handleCtaClick('demo')}
-                className="flex items-center gap-2"
+                className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
               >
-                <Play className="w-4 h-4" />
-                درخواست دمو
+                مشاوره و دمو
               </ModernButton>
-              <ModernButton
-                href="/contact?type=sales"
-                variant="outline"
-                size="lg"
-                onClick={() => handleCtaClick('sales')}
-                className="border-white/20 text-white hover:bg-white/10"
-              >
-                مشاوره تخصصی
-              </ModernButton>
-            </motion.div>
+            </div>
           </motion.div>
 
           {/* Right Content - Enterprise Visual */}

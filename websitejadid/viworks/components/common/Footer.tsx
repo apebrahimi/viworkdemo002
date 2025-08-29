@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Shield, Mail, Phone, MapPin, ArrowRight, Globe, Lock, Users, Zap, Award, Building, Cpu, Network } from 'lucide-react';
+import { Mail, Phone, MapPin } from 'lucide-react';
 
 const footerLinks = {
   product: [
@@ -53,13 +53,17 @@ export function Footer() {
       {/* Main Footer Content */}
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="py-16">
-          {/* Top Section - Brand & Newsletter */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 mb-16">
+          {/* Bottom Section - Brand & Newsletter */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
             {/* Brand & Description */}
             <div className="space-y-6">
               <div className="flex items-center space-x-3">
-                <div className="h-12 w-12 rounded-xl bg-blue-600 flex items-center justify-center shadow-lg">
-                  <Shield className="h-7 w-7 text-white" />
+                <div className="h-12 w-12 flex items-center justify-center">
+                  <img 
+                    src="/images/viworks-logo.png" 
+                    alt="ViWorks Logo" 
+                    className="h-12 w-12 object-contain"
+                  />
                 </div>
                 <div>
                   <span className="font-bold text-2xl text-white">ViWorks</span>
@@ -94,125 +98,30 @@ export function Footer() {
               </div>
             </div>
 
-            {/* Newsletter Section */}
-            <div className="bg-slate-800 border border-slate-700 rounded-2xl p-8">
-              <h3 className="text-xl font-semibold text-white mb-4">
-                از آخرین اخبار مطلع شوید
+            {/* Contact Form Section */}
+            <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6">
+              <h3 className="text-lg font-semibold text-white mb-3">
+                درخواست اطلاعات بیشتر
               </h3>
-              <p className="text-slate-300 mb-6">
-                آخرین به‌روزرسانی‌ها و اخبار امنیتی را دریافت کنید
+              <p className="text-slate-300 mb-4 text-sm leading-relaxed">
+                با توجه به ماهیت امنیت محور این راهکار اطلاعات در وبسایت به صورت حداقلی ارایه شده است. لذا جهت دریافت اطلاعات دقیق تر درباره امکانات و قابلیت های راهکار برای هماهنگی جلسه حضوری با ما در ارتباط باشید.
               </p>
-              <div className="flex gap-3 mb-6">
+              <div className="space-y-3">
                 <input
                   type="email"
                   placeholder="ایمیل شما"
-                  className="flex-1 px-4 py-3 rounded-lg bg-slate-800 border border-slate-600 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                 />
-                <button className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-all duration-200 shadow-lg hover:shadow-xl">
-                  عضویت
+                <input
+                  type="tel"
+                  placeholder="شماره تماس (اختیاری)"
+                  className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  dir="rtl"
+                />
+                <button className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-all duration-200 shadow-lg hover:shadow-xl text-sm">
+                  ارسال درخواست
                 </button>
               </div>
-
-              {/* Compliance Badges */}
-              <div className="space-y-3">
-                <h4 className="text-sm font-semibold text-white">گواهینامه‌های انطباق</h4>
-                <div className="flex flex-wrap gap-2">
-                  {complianceBadges.map((badge) => (
-                    <div key={badge.name} className="px-3 py-1 rounded-lg text-xs font-medium">
-                      <span className={`${badge.color} bg-opacity-20 px-2 py-1 rounded`}>
-                        {badge.name}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Middle Section - Links */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
-            {/* Product Links */}
-            <div>
-              <h3 className="font-semibold text-white text-lg mb-6 flex items-center">
-                <Globe className="w-5 h-4 mr-2 text-blue-400" />
-                محصول
-              </h3>
-              <ul className="space-y-3">
-                {footerLinks.product.map((link) => (
-                  <li key={link.href}>
-                    <Link
-                      href={link.href}
-                      className="text-slate-300 hover:text-white transition-colors flex items-center group text-sm"
-                    >
-                      <ArrowRight className="w-3 h-3 mr-2 opacity-0 group-hover:opacity-100 transition-opacity" />
-                      {link.name}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Solutions Links */}
-            <div>
-              <h3 className="font-semibold text-white text-lg mb-6 flex items-center">
-                <Building className="w-5 h-4 mr-2 text-green-400" />
-                راهکارها
-              </h3>
-              <ul className="space-y-3">
-                {footerLinks.solutions.map((link) => (
-                  <li key={link.href}>
-                    <Link
-                      href={link.href}
-                      className="text-slate-300 hover:text-white transition-colors flex items-center group text-sm"
-                    >
-                      <ArrowRight className="w-3 h-3 mr-2 opacity-0 group-hover:opacity-100 transition-opacity" />
-                      {link.name}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Support Links */}
-            <div>
-              <h3 className="font-semibold text-white text-lg mb-6 flex items-center">
-                <Shield className="w-5 h-4 mr-2 text-purple-400" />
-                پشتیبانی
-              </h3>
-              <ul className="space-y-3">
-                {footerLinks.support.map((link) => (
-                  <li key={link.href}>
-                    <Link
-                      href={link.href}
-                      className="text-slate-300 hover:text-white transition-colors flex items-center group text-sm"
-                    >
-                      <ArrowRight className="w-3 h-3 mr-2 opacity-0 group-hover:opacity-100 transition-opacity" />
-                      {link.name}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Company Links */}
-            <div>
-              <h3 className="font-semibold text-white text-lg mb-6 flex items-center">
-                <Users className="w-5 h-4 mr-2 text-orange-400" />
-                شرکت
-              </h3>
-              <ul className="space-y-3">
-                {footerLinks.company.map((link) => (
-                  <li key={link.href}>
-                    <Link
-                      href={link.href}
-                      className="text-slate-300 hover:text-white transition-colors flex items-center group text-sm"
-                    >
-                      <ArrowRight className="w-3 h-3 mr-2 opacity-0 group-hover:opacity-100 transition-opacity" />
-                      {link.name}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
             </div>
           </div>
         </div>

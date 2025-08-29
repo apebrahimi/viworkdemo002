@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { Menu, ChevronDown, Shield, Award, Users, Globe } from 'lucide-react';
+import { Menu, ChevronDown, Shield, Award, Users } from 'lucide-react';
 import { defaultLocale, t } from '@/lib/i18n';
 import { analytics } from '@/lib/analytics';
 
@@ -53,7 +53,7 @@ export function Header() {
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
   const locale = defaultLocale;
 
-  const handleCtaClick = (type: 'demo' | 'sales' | 'support') => {
+  const handleCtaClick = (type: 'demo' | 'sales' | 'support' | 'login') => {
     switch (type) {
       case 'demo':
         analytics.heroCtaDemoClick();
@@ -62,6 +62,9 @@ export function Header() {
         analytics.heroCtaSalesClick();
         break;
       case 'support':
+        analytics.supportPortalClick();
+        break;
+      case 'login':
         analytics.supportPortalClick();
         break;
     }
@@ -75,8 +78,7 @@ export function Header() {
           <div className="flex items-center justify-between text-sm">
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
-                <Shield className="w-4 h-4" />
-                <span className="font-medium">پلتفرم امنیتی سازمانی</span>
+                <span className="font-medium">امنیت در دورکاری</span>
               </div>
               <div className="hidden sm:flex items-center gap-4">
                 {enterpriseFeatures.map((feature, index) => (
@@ -89,7 +91,7 @@ export function Header() {
             </div>
             <div className="flex items-center gap-4">
               <span className="text-xs">پشتیبانی 24/7</span>
-              <Link href="/support" className="text-xs hover:underline">
+              <Link href="/login" className="text-xs hover:underline">
                 تماس با پشتیبانی
               </Link>
             </div>
@@ -103,8 +105,12 @@ export function Header() {
           {/* Logo */}
           <div className="flex items-center">
             <Link href="/" className="flex items-center space-x-3">
-              <div className="h-10 w-10 rounded-xl bg-blue-600 flex items-center justify-center shadow-lg">
-                <Shield className="h-6 w-6 text-white" />
+              <div className="h-12 w-12 flex items-center justify-center">
+                <img 
+                  src="/images/viworks-logo.png" 
+                  alt="ViWorks Logo" 
+                  className="h-12 w-12 object-contain"
+                />
               </div>
               <div>
                 <span className="font-bold text-xl text-slate-900 dark:text-white">ViWorks</span>
@@ -154,12 +160,12 @@ export function Header() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => handleCtaClick('support')}
+              onClick={() => handleCtaClick('login')}
               asChild
               className="text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
             >
-              <Link href="/support">
-                پشتیبانی
+              <Link href="/login">
+                ورود
               </Link>
             </Button>
             <Button
@@ -168,16 +174,7 @@ export function Header() {
               className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 font-semibold shadow-lg hover:shadow-xl transition-all duration-300 rounded-lg"
             >
               <Link href="/contact?type=demo">
-                درخواست دمو
-              </Link>
-            </Button>
-            <Button
-              onClick={() => handleCtaClick('sales')}
-              asChild
-              className="bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100 px-6 py-2 font-semibold shadow-lg hover:shadow-xl transition-all duration-300 rounded-lg"
-            >
-              <Link href="/contact?type=sales">
-                {t(locale, 'cta.talkToSales')}
+                مشاوره و دمو
               </Link>
             </Button>
           </div>
@@ -228,19 +225,7 @@ export function Header() {
                       asChild
                     >
                       <Link href="/contact?type=demo">
-                        درخواست دمو
-                      </Link>
-                    </Button>
-                    <Button
-                      className="w-full justify-start bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100 font-semibold shadow-lg hover:shadow-xl transition-all duration-300 rounded-lg"
-                      onClick={() => {
-                        handleCtaClick('sales');
-                        setIsMobileMenuOpen(false);
-                      }}
-                      asChild
-                    >
-                      <Link href="/contact?type=sales">
-                        {t(locale, 'cta.talkToSales')}
+                        مشاوره و دمو
                       </Link>
                     </Button>
                   </div>

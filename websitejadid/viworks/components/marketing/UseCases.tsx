@@ -117,8 +117,18 @@ const industries = [
 ];
 
 export function UseCases() {
+  const handleCtaClick = (type: 'demo' | 'consulting') => {
+    if (type === 'demo') {
+      // Implement demo logic
+      console.log('Demo button clicked');
+    } else if (type === 'consulting') {
+      // Implement consulting logic
+      console.log('Consulting button clicked');
+    }
+  };
+
   return (
-    <section className="py-16 lg:py-20 bg-white">
+    <section className="py-16 lg:py-20 bg-slate-50">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-7xl">
           {/* Section Header */}
@@ -276,13 +286,16 @@ export function UseCases() {
               <p className="text-blue-100 mb-6 max-w-2xl mx-auto">
                 با تیم متخصص ما مشورت کنید تا بهترین راه‌حل امنیتی را برای سازمان شما پیدا کنیم
               </p>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <Button className="bg-white text-blue-600 hover:bg-blue-50 px-6 py-3">
-                  <ArrowRight className="w-4 h-4 mr-2" />
-                  مشاهده راهکارهای تخصصی
-                </Button>
-                <Button variant="outline" className="border-white text-white hover:bg-white hover:text-blue-600 px-6 py-3">
-                  مشاوره رایگان
+              {/* CTA Buttons */}
+              <div className="flex justify-center">
+                <Button 
+                  size="lg" 
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
+                  asChild
+                >
+                  <Link href="/contact?type=demo" onClick={() => handleCtaClick('demo')}>
+                    مشاوره و دمو
+                  </Link>
                 </Button>
               </div>
             </div>

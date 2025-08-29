@@ -6,18 +6,16 @@ import { Card, CardContent } from '@/components/ui/card';
 import { 
   Award, 
   Shield, 
-  CheckCircle, 
   Star, 
   Users, 
-  Globe, 
   Building,
   Lock,
   Zap,
   Cpu,
-  Banknote,
-  Heart,
-  Gavel
+  ArrowRight
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import Link from 'next/link';
 
 const trustIndicators = [
   {
@@ -113,14 +111,19 @@ const securityMetrics = [
 ];
 
 export function TrustBar() {
+  const handleCtaClick = (type: 'demo' | 'consulting') => {
+    // Analytics tracking can be implemented here if needed
+  };
+
   return (
-    <section className="py-16 lg:py-20 bg-slate-50 relative overflow-hidden">
+    <section className="py-16 lg:py-20 bg-gradient-to-br from-slate-50 via-blue-50 to-slate-50 relative overflow-hidden">
       {/* Background Pattern */}
       <div className="absolute inset-0 opacity-20">
-        <div className="absolute inset-0 bg-blue-500/5" />
+        <div className="absolute top-0 left-0 w-32 h-32 bg-blue-400 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-0 right-0 w-40 h-40 bg-slate-400 rounded-full blur-3xl"></div>
       </div>
       
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative">
         <div className="mx-auto max-w-7xl">
           {/* Section Header */}
           <motion.div
@@ -238,7 +241,7 @@ export function TrustBar() {
                       ))}
                     </div>
                     <blockquote className="text-base text-slate-700 mb-4 italic leading-relaxed">
-                      "{testimonial.quote}"
+                      &ldquo;{testimonial.quote}&rdquo;
                     </blockquote>
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
@@ -280,13 +283,17 @@ export function TrustBar() {
               <p className="text-lg text-blue-100 mb-6 max-w-2xl mx-auto">
                 با بیش از 500 سازمان موفق، ViWorkS راه‌حل اثبات‌شده برای امنیت دسترسی از راه دور است
               </p>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <button className="bg-white text-blue-600 hover:bg-blue-50 px-6 py-3 rounded-lg font-semibold shadow-sm hover:shadow-md transition-all duration-300">
-                  درخواست دمو
-                </button>
-                <button className="border-2 border-white text-white hover:bg-white hover:text-blue-600 px-6 py-3 rounded-lg font-semibold transition-all duration-300">
-                  مشاوره تخصصی
-                </button>
+              {/* CTA Buttons */}
+              <div className="flex justify-center">
+                <Button 
+                  size="lg" 
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
+                  asChild
+                >
+                  <Link href="/contact?type=demo" onClick={() => handleCtaClick('demo')}>
+                    مشاوره و دمو
+                  </Link>
+                </Button>
               </div>
             </div>
           </motion.div>

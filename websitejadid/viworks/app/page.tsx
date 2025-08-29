@@ -1,6 +1,7 @@
 import { Metadata } from 'next';
 import { Header } from '@/components/common/Header';
 import { Footer } from '@/components/common/Footer';
+import { VerticalNav } from '@/components/common/VerticalNav';
 import { Hero } from '@/components/marketing/Hero';
 import { ViWorkSOverview } from '@/components/marketing/ViWorkSOverview';
 import { PainPoints } from '@/components/marketing/PainPoints';
@@ -26,19 +27,44 @@ export default function HomePage() {
   return (
     <>
       <Header />
+      <VerticalNav />
       <main>
-        <Hero />
-        <ViWorkSOverview />
-        <HowItWorks />
-        <UseCases />
-        <FeatureGrid />
-        <PlatformCompatibility />
-        <DeploymentOptions />
-        <Integrations />
-        <ComparisonTable />
-        <TrustBar />
-        <FAQAccordion />
-        <ClosingCta />
+        <div id="hero">
+          <Hero />
+        </div>
+        <div id="overview">
+          <ViWorkSOverview />
+        </div>
+        <div id="how-it-works">
+          <HowItWorks />
+        </div>
+        <div id="use-cases">
+          <UseCases />
+        </div>
+        <div id="features">
+          <FeatureGrid />
+        </div>
+        <div id="platforms">
+          <PlatformCompatibility />
+        </div>
+        <div id="deployment">
+          <DeploymentOptions />
+        </div>
+        <div id="integrations">
+          <Integrations />
+        </div>
+        <div id="comparison">
+          <ComparisonTable />
+        </div>
+        <div id="trust">
+          <TrustBar />
+        </div>
+        <div id="faq">
+          <FAQAccordion />
+        </div>
+        <div id="contact">
+          <ClosingCta />
+        </div>
       </main>
       <Footer />
     </>

@@ -14,6 +14,7 @@ import {
   ArrowRight,
   CheckCircle
 } from 'lucide-react';
+import Link from 'next/link';
 
 const features = [
   {
@@ -109,9 +110,22 @@ const features = [
 ];
 
 export function FeatureGrid() {
+  const handleCtaClick = (type: 'demo' | 'consultation') => {
+    // Analytics tracking can be implemented here if needed
+  };
+
   return (
-    <section className="py-16 lg:py-20 bg-white">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+    <section className="py-16 lg:py-20 bg-slate-900 relative overflow-hidden">
+      {/* Background Pattern */}
+      <div className="absolute inset-0 opacity-25">
+        <div className="absolute top-0 left-0 w-32 h-32 bg-blue-400 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-0 right-0 w-40 h-40 bg-purple-400 rounded-full blur-3xl"></div>
+        <div className="absolute inset-0" style={{
+          backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3Cpattern id='features-pattern' x='0' y='0' width='30' height='30' patternUnits='userSpaceOnUse'%3E%3Cpolygon points='15,0 30,15 15,30 0,15' fill='%23ffffff' fill-opacity='0.2'/%3E%3C/pattern%3E%3C/defs%3E%3Crect width='60' height='60' fill='url(%23features-pattern)'/%3E%3C/svg%3E")`
+        }} />
+      </div>
+      
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative">
         <div className="mx-auto max-w-7xl">
           {/* Section Header */}
           <motion.div
@@ -121,13 +135,13 @@ export function FeatureGrid() {
             transition={{ duration: 0.6 }}
             className="text-center mb-12"
           >
-            <Badge variant="secondary" className="mb-4 bg-blue-100 text-blue-700 border-blue-200">
+            <Badge variant="secondary" className="mb-4 bg-white/10 text-white border-white/20 backdrop-blur-sm">
               قابلیت‌های منحصر به فرد
             </Badge>
-            <h2 className="text-2xl lg:text-3xl font-bold text-slate-900 mb-4">
+            <h2 className="text-2xl lg:text-3xl font-bold text-white mb-4">
               قابلیت‌های پیشرفته امنیتی
             </h2>
-            <p className="text-lg text-slate-600 max-w-3xl mx-auto">
+            <p className="text-lg text-slate-300 max-w-3xl mx-auto">
               طراحی بر پایه Zero Trust Architecture با قابلیت‌های منحصر به فرد برای امنیت دسترسی از راه دور
             </p>
           </motion.div>
@@ -192,13 +206,16 @@ export function FeatureGrid() {
               <p className="text-blue-100 mb-6 max-w-2xl mx-auto">
                 با تیم متخصص ما مشورت کنید تا بهترین راه‌حل امنیتی را برای سازمان شما پیدا کنیم
               </p>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <Button className="bg-white text-blue-600 hover:bg-blue-50 px-6 py-3">
-                  <ArrowRight className="w-4 h-4 mr-2" />
-                  درخواست دمو
-                </Button>
-                <Button variant="outline" className="border-white text-white hover:bg-white hover:text-blue-600 px-6 py-3">
-                  مشاوره رایگان
+              {/* CTA Buttons */}
+              <div className="flex justify-center">
+                <Button 
+                  size="lg" 
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
+                  asChild
+                >
+                  <Link href="/contact?type=demo" onClick={() => handleCtaClick('demo')}>
+                    مشاوره و دمو
+                  </Link>
                 </Button>
               </div>
             </div>

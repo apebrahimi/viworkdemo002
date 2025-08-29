@@ -43,7 +43,7 @@ export function ModernButton({
       {external ? (
         <ExternalLink className="w-4 h-4" />
       ) : (
-        <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+        <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1 rtl:group-hover:-translate-x-1 transform scale-x-[-1]" />
       )}
     </div>
   );
