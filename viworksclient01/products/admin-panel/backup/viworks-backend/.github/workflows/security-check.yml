@@ -1,0 +1,140 @@
+name: Security Check
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Run weekly on Sundays at 2 AM UTC
+    - cron: '0 2 * * 0'
+
+jobs:
+  security-audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+        
+    - name: Cache dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-
+          
+    - name: Install cargo-audit
+      run: cargo install cargo-audit
+      
+    - name: Run security audit
+      run: |
+        echo "🔍 Running cargo audit..."
+        cargo audit --deny warnings || {
+          echo "⚠️  Security vulnerabilities found!"
+          echo "Review the output above and address any issues."
+          exit 1
+        }
+        
+    - name: Check dependency tree
+      run: |
+        echo "🌳 Checking dependency tree..."
+        if cargo tree | grep -i "mysql"; then
+          echo "❌ ERROR: MySQL dependencies found - this should not happen!"
+          exit 1
+        else
+          echo "✅ No MySQL dependencies found"
+        fi
+        
+        if cargo tree | grep -i "rsa"; then
+          echo "⚠️  WARNING: RSA dependencies found (expected due to SQLx)"
+          echo "This is being monitored for security updates."
+        else
+          echo "✅ No RSA dependencies found"
+        fi
+        
+    - name: Verify SQLx configuration
+      run: |
+        echo "⚙️  Checking SQLx configuration..."
+        if grep -q "default-features = false" Cargo.toml; then
+          echo "✅ SQLx default features are disabled (good security practice)"
+        else
+          echo "❌ ERROR: SQLx default features are enabled - security risk!"
+          exit 1
+        fi
+        
+        if grep -q "features = \[.*postgres.*\]" Cargo.toml; then
+          echo "✅ PostgreSQL features are explicitly enabled"
+        else
+          echo "❌ ERROR: PostgreSQL features not explicitly configured"
+          exit 1
+        fi
+        
+    - name: Test compilation
+      run: |
+        echo "🔨 Testing compilation..."
+        cargo check --quiet || {
+          echo "❌ Compilation failed!"
+          exit 1
+        }
+        echo "✅ Compilation successful"
+        
+    - name: Run tests
+      run: |
+        echo "🧪 Running tests..."
+        cargo test --quiet || {
+          echo "❌ Tests failed!"
+          exit 1
+        }
+        echo "✅ All tests passed"
+        
+    - name: Generate security report
+      run: |
+        echo "📊 Generating security report..."
+        {
+          echo "# Security Audit Report"
+          echo "Generated: $(date)"
+          echo "Commit: ${{ github.sha }}"
+          echo ""
+          echo "## Cargo Audit Results"
+          cargo audit 2>&1 || echo "Vulnerabilities found"
+          echo ""
+          echo "## Dependency Analysis"
+          echo "MySQL dependencies: $(cargo tree | grep -i mysql | wc -l | tr -d ' ')"
+          echo "RSA dependencies: $(cargo tree | grep -i rsa | wc -l | tr -d ' ')"
+          echo ""
+          echo "## SQLx Configuration"
+          grep -A 5 -B 5 "sqlx" Cargo.toml
+        } > security-report.txt
+        
+    - name: Upload security report
+      uses: actions/upload-artifact@v3
+      with:
+        name: security-report-${{ github.sha }}
+        path: security-report.txt
+        
+    - name: Comment on PR
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+          const report = fs.readFileSync('security-report.txt', 'utf8');
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: `## 🔍 Security Audit Results\n\n\`\`\`\n${report}\n\`\`\`\n\nSecurity audit completed for commit ${context.sha}`
+          });

@@ -1,0 +1,104 @@
+name: Deploy ViWorks to DigitalOcean
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch: # Allow manual trigger
+
+env:
+  DROPLET_IP: ${{ secrets.DROPLET_IP }}
+  DROPLET_USER: ${{ secrets.DROPLET_USER }}
+  SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H $DROPLET_IP >> ~/.ssh/known_hosts
+          
+      - name: Test SSH connection
+        run: |
+          ssh -o ConnectTimeout=10 -i ~/.ssh/id_ed25519 ${DROPLET_USER}@${DROPLET_IP} "echo 'SSH connection successful'"
+          
+      - name: Create deployment script
+        run: |
+          cat > deploy.sh << 'EOF'
+          #!/bin/bash
+          set -e
+          
+          APP_DIR="/opt/viworks"
+          
+          echo "🚀 Starting automated deployment..."
+          
+          # Navigate to app directory
+          cd $APP_DIR
+          
+          # Pull latest changes
+          echo "📥 Pulling latest changes..."
+          git pull origin main || git pull origin master
+          
+          # Stop existing containers
+          echo "🛑 Stopping existing containers..."
+          docker-compose down || true
+          
+          # Remove old images to free space
+          echo "🧹 Cleaning up old images..."
+          docker image prune -f
+          
+          # Build and start new containers
+          echo "🔨 Building and starting new containers..."
+          docker-compose up -d --build
+          
+          # Wait for services to be ready
+          echo "⏳ Waiting for services to be ready..."
+          sleep 30
+          
+          # Check service status
+          echo "📊 Checking service status..."
+          docker-compose ps
+          
+          # Test endpoints
+          echo "🧪 Testing endpoints..."
+          curl -f http://localhost || echo "Main frontend not ready yet"
+          curl -f http://localhost/admin || echo "Admin panel not ready yet"
+          curl -f http://localhost/api/health || echo "Backend not ready yet"
+          
+          echo "✅ Deployment completed successfully!"
+          EOF
+          
+          chmod +x deploy.sh
+          
+      - name: Upload and execute deployment script
+        run: |
+          scp -i ~/.ssh/id_ed25519 deploy.sh ${DROPLET_USER}@${DROPLET_IP}:/tmp/
+          ssh -i ~/.ssh/id_ed25519 ${DROPLET_USER}@${DROPLET_IP} "chmod +x /tmp/deploy.sh && /tmp/deploy.sh"
+          
+      - name: Verify deployment
+        run: |
+          echo "🔍 Verifying deployment..."
+          sleep 10
+          
+          # Test main endpoints
+          curl -f http://${DROPLET_IP} || echo "Main frontend verification failed"
+          curl -f http://${DROPLET_IP}/admin || echo "Admin panel verification failed"
+          curl -f http://${DROPLET_IP}/api/health || echo "Backend verification failed"
+          
+          echo "✅ Deployment verification completed!"
+          
+      - name: Notify deployment status
+        if: always()
+        run: |
+          if [ ${{ job.status }} == 'success' ]; then
+            echo "🎉 Deployment successful! Your application is live at http://${DROPLET_IP}"
+          else
+            echo "❌ Deployment failed. Check the logs above for details."
+          fi

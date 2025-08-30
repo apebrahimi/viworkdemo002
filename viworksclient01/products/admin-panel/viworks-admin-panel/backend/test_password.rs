@@ -1,1 +1,0 @@
-use bcrypt::{hash, verify, DEFAULT_COST}; fn main() { let hash = "$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj/RK.s5uOeK"; let password = "admin123"; match verify(password, hash) { Ok(valid) => println!("Password valid: {}", valid), Err(e) => println!("Error: {}", e) } }

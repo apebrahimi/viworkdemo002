@@ -1,0 +1,153 @@
+name: Deploy Specific Application
+
+on:
+  workflow_dispatch:
+    inputs:
+      application:
+        description: 'Application to deploy'
+        required: true
+        default: 'viworks'
+        type: choice
+        options:
+          - viworks
+          - admin-panel
+          - frontend
+          - backend
+          - all
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+          - development
+      branch:
+        description: 'Branch to deploy'
+        required: true
+        default: 'main'
+        type: string
+
+env:
+  DROPLET_IP: ${{ secrets.DROPLET_IP }}
+  DROPLET_USER: ${{ secrets.DROPLET_USER }}
+  SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch }}
+          
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H $DROPLET_IP >> ~/.ssh/known_hosts
+          
+      - name: Test SSH connection
+        run: |
+          ssh -o ConnectTimeout=10 -i ~/.ssh/id_ed25519 ${DROPLET_USER}@${DROPLET_IP} "echo 'SSH connection successful'"
+          
+      - name: Create targeted deployment script
+        run: |
+          cat > deploy-specific.sh << 'EOF'
+          #!/bin/bash
+          set -e
+          
+          APP_DIR="/opt/viworks"
+          APPLICATION="${{ github.event.inputs.application }}"
+          ENVIRONMENT="${{ github.event.inputs.environment }}"
+          
+          echo "🚀 Starting deployment for $APPLICATION to $ENVIRONMENT..."
+          
+          cd $APP_DIR
+          
+          # Pull latest changes
+          echo "📥 Pulling latest changes from ${{ github.event.inputs.branch }}..."
+          git fetch origin
+          git checkout ${{ github.event.inputs.branch }}
+          git pull origin ${{ github.event.inputs.branch }}
+          
+          # Deploy based on application type
+          case $APPLICATION in
+            "viworks"|"all")
+              echo "🔨 Deploying full ViWorks stack..."
+              docker-compose down || true
+              docker-compose up -d --build
+              ;;
+            "admin-panel")
+              echo "🔨 Deploying admin panel only..."
+              docker-compose stop admin-frontend backend || true
+              docker-compose up -d --build admin-frontend backend
+              ;;
+            "frontend")
+              echo "🔨 Deploying main frontend only..."
+              docker-compose stop frontend || true
+              docker-compose up -d --build frontend
+              ;;
+            "backend")
+              echo "🔨 Deploying backend only..."
+              docker-compose stop backend || true
+              docker-compose up -d --build backend
+              ;;
+          esac
+          
+          # Wait for services
+          echo "⏳ Waiting for services to be ready..."
+          sleep 30
+          
+          # Check status
+          echo "📊 Service status:"
+          docker-compose ps
+          
+          echo "✅ Deployment completed!"
+          EOF
+          
+          chmod +x deploy-specific.sh
+          
+      - name: Upload and execute deployment script
+        run: |
+          scp -i ~/.ssh/id_ed25519 deploy-specific.sh ${DROPLET_USER}@${DROPLET_IP}:/tmp/
+          ssh -i ~/.ssh/id_ed25519 ${DROPLET_USER}@${DROPLET_IP} "chmod +x /tmp/deploy-specific.sh && /tmp/deploy-specific.sh"
+          
+      - name: Verify deployment
+        run: |
+          echo "🔍 Verifying deployment..."
+          sleep 10
+          
+          case "${{ github.event.inputs.application }}" in
+            "viworks"|"all")
+              curl -f http://${DROPLET_IP} || echo "Main frontend verification failed"
+              curl -f http://${DROPLET_IP}/admin || echo "Admin panel verification failed"
+              curl -f http://${DROPLET_IP}/api/health || echo "Backend verification failed"
+              ;;
+            "admin-panel")
+              curl -f http://${DROPLET_IP}/admin || echo "Admin panel verification failed"
+              curl -f http://${DROPLET_IP}/api/health || echo "Backend verification failed"
+              ;;
+            "frontend")
+              curl -f http://${DROPLET_IP} || echo "Frontend verification failed"
+              ;;
+            "backend")
+              curl -f http://${DROPLET_IP}/api/health || echo "Backend verification failed"
+              ;;
+          esac
+          
+          echo "✅ Verification completed!"
+          
+      - name: Notify deployment status
+        if: always()
+        run: |
+          if [ ${{ job.status }} == 'success' ]; then
+            echo "🎉 Deployment of ${{ github.event.inputs.application }} to ${{ github.event.inputs.environment }} successful!"
+            echo "🌐 Application URL: http://${DROPLET_IP}"
+          else
+            echo "❌ Deployment failed. Check the logs above for details."
+          fi

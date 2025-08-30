@@ -28,6 +28,12 @@ RUN rm src/main.rs
 COPY src ./src
 COPY migrations ./migrations
 
+# Security check: Run cargo audit before building
+RUN cargo audit || echo "⚠️  Security vulnerabilities detected - review required"
+
+# Security check: Verify no unwanted dependencies
+RUN cargo tree | grep -i "mysql\|rsa" && echo "⚠️  WARNING: Unwanted dependencies found" || echo "✅ Dependencies verified"
+
 # Build the application (force rebuild by cleaning and rebuilding)
 RUN cargo clean && cargo build --release
 

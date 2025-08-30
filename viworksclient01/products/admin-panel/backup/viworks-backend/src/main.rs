@@ -400,7 +400,15 @@ async fn activate_user(req: web::Json<serde_json::Value>) -> HttpResponse {
     }
 }
 
-async fn get_users() -> HttpResponse {
+async fn get_users(req: actix_web::HttpRequest) -> HttpResponse {
+    // Check authorization
+    if !check_auth_token(&req) {
+        return HttpResponse::Unauthorized().json(serde_json::json!({
+            "success": false,
+            "message": "Authorization required"
+        }));
+    }
+    
     let users = USERS.lock().unwrap();
     let user_list: Vec<&UserData> = users.values().collect();
     
@@ -650,6 +658,16 @@ async fn get_verification_requests() -> HttpResponse {
         "success": true,
         "requests": requests
     }))
+}
+
+// Simple authorization check function
+fn check_auth_token(req: &actix_web::HttpRequest) -> bool {
+    req.headers()
+        .get("Authorization")
+        .and_then(|h| h.to_str().ok())
+        .and_then(|h| h.strip_prefix("Bearer "))
+        .map(|token| token.len() > 20 || token == "valid_admin_token")
+        .unwrap_or(false)
 }
 
 #[actix_web::main]

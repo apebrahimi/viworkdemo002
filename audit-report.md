@@ -1,5 +1,5 @@
 # 🔍 ViWorkS Project Audit Report
-_Generated: 2025-08-30 00:32:31 UTC — Commit: 67624ed
+_Generated: 2025-08-30 07:50:59 UTC — Commit: b4d74f4
 
 ## Repo Overview
 - Detected Node PM: pnpm
@@ -66,12 +66,10 @@ _Generated: 2025-08-30 00:32:31 UTC — Commit: 67624ed
 ./viworksclient01/products/admin-panel/viworks-admin-panel/backend/Dockerfile.simple
 ./viworksclient01/products/admin-panel/viworks-admin-panel/backend/Dockerfile.working
 ./viworksclient01/products/admin-panel/viworks-admin-panel/backend/Dockerfile.minimal
-./viworksclient01/products/admin-panel/viworks-admin-panel/backend/Dockerfile.secure
 ./viworksclient01/products/admin-panel/viworks-admin-panel/backend/Dockerfile.fixed
 ./viworksclient01/products/admin-panel/viworks-admin-panel/backend/Dockerfile.debug
 ./viworksclient01/products/admin-panel/backup/viworks-frontend/Dockerfile
 ./viworksclient01/products/admin-panel/backup/viworks-backend/Dockerfile
-./viworksclient01/products/admin-panel/backup/viworks-backend/Dockerfile.secure
 ./viworksclient01/docs/temp/frontend/Dockerfile
 ./docker_backup_20250830_013149/viworks-frontend/Dockerfile
 ./docker_backup_20250830_013149/viworksclient01/products/admin-panel/frontend/Dockerfile
@@ -119,8 +117,6 @@ FROM rust:1.89.0-alpine as builder
 FROM alpine:3.22
 FROM alpine:3.22 as production
 FROM rust:1.89.0-alpine as builder
-FROM alpine:3.22 as production
-FROM rust:1.89.0-alpine as builder
 FROM alpine:3.22
 FROM alpine:3.22 as production
 FROM rust:1.89.0-alpine as builder
@@ -130,9 +126,6 @@ FROM node:22-alpine AS builder
 FROM node:22-alpine AS runner
 FROM rust:1.89.0-alpine as builder
 FROM alpine:3.22
-FROM alpine:3.22 as production
-FROM rust:1.89.0-alpine as builder
-FROM alpine:3.22 as production
 FROM node:18-alpine AS builder
 FROM node:18-alpine AS runner
 FROM node:18-alpine AS builder
