@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Eye, EyeOff, Shield, AlertCircle } from 'lucide-react';
+import { Eye, EyeOff, Shield, AlertCircle, CheckCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 const loginSchema = z.object({
@@ -18,6 +18,7 @@ type LoginFormData = z.infer<typeof loginSchema>;
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const { login, isLoading } = useAuth();
   const router = useRouter();
 
@@ -32,8 +33,16 @@ export default function LoginPage() {
   const onSubmit = async (data: LoginFormData) => {
     try {
       setError(null);
+      setSuccess(null);
       await login(data);
-      router.push('/');
+      
+      // Show success message and redirect immediately
+      setSuccess('Login successful! Redirecting to dashboard...');
+      
+      // Redirect after a short delay
+      setTimeout(() => {
+        router.push('/');
+      }, 1500);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Login failed. Please try again.');
     }
@@ -62,6 +71,19 @@ export default function LoginPage() {
                 <div className="ml-3">
                   <h3 className="text-sm font-medium text-red-800">
                     {error}
+                  </h3>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {success && (
+            <div className="rounded-md bg-green-50 p-4">
+              <div className="flex">
+                <CheckCircle className="h-5 w-5 text-green-400" />
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-green-800">
+                    {success}
                   </h3>
                 </div>
               </div>
