@@ -55,7 +55,7 @@ export function DemoDashboardSection() {
     const fetchDemoData = async () => {
       try {
         // Test backend health
-        const healthResponse = await fetch('http://localhost:8080/health');
+        const healthResponse = await fetch('/health');
         const healthData = await healthResponse.json();
         
         // Generate demo activity
@@ -339,7 +339,7 @@ export function DemoDashboardSection() {
           <button 
             onClick={async () => {
               try {
-                const response = await fetch('http://localhost:8080/api/v1/auth/login', {
+                const response = await fetch('/api/v1/auth/login', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ username: 'demo', password: 'demo' })
@@ -366,7 +366,7 @@ export function DemoDashboardSection() {
           <button 
             onClick={async () => {
               try {
-                const response = await fetch('http://localhost:8080/api/v1/agent/container/spawn', {
+                const response = await fetch('/api/v1/agent/container/spawn', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ username: 'demo_user', session_id: 'demo_session' })
@@ -393,7 +393,7 @@ export function DemoDashboardSection() {
           <button 
             onClick={async () => {
               try {
-                const response = await fetch('http://localhost:8080/health');
+                const response = await fetch('/health');
                 const data = await response.json();
                 alert(`Health check: ${data.status}\nMessage: ${data.message}`);
               } catch (error) {

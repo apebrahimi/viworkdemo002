@@ -34,8 +34,10 @@ export const RealtimeProvider: React.FC<RealtimeProviderProps> = ({ children }) 
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const host = process.env.NEXT_PUBLIC_API_URL?.replace(/^https?:\/\//, '') || 'localhost:8081';
-      setWsUrl(`${protocol}//${host}/ws`);
+      // Use the same host as the current page for WebSocket
+      const host = window.location.hostname;
+      const port = process.env.NODE_ENV === 'production' ? '' : ':8081';
+      setWsUrl(`${protocol}//${host}${port}/ws`);
     }
   }, []);
 
