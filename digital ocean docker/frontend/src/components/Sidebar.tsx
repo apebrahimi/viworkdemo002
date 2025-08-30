@@ -52,6 +52,20 @@ export function Sidebar({ isOpen, onToggle, activeTab, onTabChange }: SidebarPro
     setIsExpanded(!isExpanded);
   };
 
+  const handleNotificationsClick = () => {
+    // TODO: Open notifications panel or navigate to notifications page
+    console.log('Notifications clicked');
+    // For now, just show an alert
+    alert(language === 'fa' ? 'اعلان‌ها: این بخش در حال توسعه است' : 'Notifications: This section is under development');
+  };
+
+  const handleSettingsClick = () => {
+    // TODO: Navigate to settings page or open settings modal
+    console.log('Settings clicked');
+    // For now, just show an alert
+    alert(language === 'fa' ? 'تنظیمات: این بخش در حال توسعه است' : 'Settings: This section is under development');
+  };
+
   return (
     <>
       {/* Mobile Overlay */}
@@ -86,7 +100,9 @@ export function Sidebar({ isOpen, onToggle, activeTab, onTabChange }: SidebarPro
                 </div>
                 <div>
                   <h1 className="text-sm font-bold text-foreground">ViWorkS</h1>
-                  <p className="text-xs text-muted-foreground">پنل مدیریت</p>
+                  <p className="text-xs text-muted-foreground">
+                    {language === 'fa' ? 'پنل مدیریت' : 'Admin Panel'}
+                  </p>
                 </div>
               </div>
             )}
@@ -215,6 +231,7 @@ export function Sidebar({ isOpen, onToggle, activeTab, onTabChange }: SidebarPro
             <div className="space-y-1">
               {/* Notifications */}
               <button 
+                onClick={handleNotificationsClick}
                 className={`
                   w-full flex items-center justify-between
                   ${isExpanded ? 'px-3 py-2' : 'px-2 py-2 justify-center'} 
@@ -267,6 +284,7 @@ export function Sidebar({ isOpen, onToggle, activeTab, onTabChange }: SidebarPro
 
               {/* Settings */}
               <button 
+                onClick={handleSettingsClick}
                 className={`
                   w-full flex items-center justify-between
                   ${isExpanded ? 'px-3 py-2' : 'px-2 py-2 justify-center'} 
