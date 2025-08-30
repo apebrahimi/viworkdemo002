@@ -9,135 +9,53 @@ use rand::Rng;
 use uuid::Uuid;
 use once_cell::sync::Lazy;
 
-// Global state for demo data
+// Add panic hook for debugging
+use std::panic;
+
+// Set up panic hook to capture panics
+fn setup_panic_hook() {
+    panic::set_hook(Box::new(|panic_info| {
+        eprintln!("🚨 PANIC: {}", panic_info);
+        if let Some(location) = panic_info.location() {
+            eprintln!("   Location: {}:{}:{}", location.file(), location.line(), location.column());
+        }
+        if let Some(s) = panic_info.payload().downcast_ref::<&str>() {
+            eprintln!("   Message: {}", s);
+        }
+        if let Some(s) = panic_info.payload().downcast_ref::<String>() {
+            eprintln!("   Message: {}", s);
+        }
+    }));
+}
+
+// Enhanced logging initialization
+fn init_logging() {
+    if env::var("RUST_LOG").is_err() {
+        env::set_var("RUST_LOG", "info,sqlx=warn,actix_web=info");
+    }
+    let _ = env_logger::builder().is_test(false).try_init();
+}
+
+// Import our modules
+mod database;
+mod models;
+
+use database::Database;
+use models::*;
+
+// Global state for demo data (fallback when database is not available)
 static SESSIONS: Lazy<Mutex<HashMap<String, SessionData>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 static USERS: Lazy<Mutex<HashMap<String, UserData>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 static DEVICE_REQUESTS: Lazy<Mutex<HashMap<String, DeviceRequest>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 static USER_DEVICES: Lazy<Mutex<HashMap<String, UserDevice>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 static VERIFICATION_REQUESTS: Lazy<Mutex<HashMap<String, VerificationRequest>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 
-// Data structures
+// Legacy data structures for backward compatibility
 #[derive(Debug, Serialize, Deserialize)]
 struct HealthResponse {
     status: String,
     timestamp: String,
     version: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct LoginRequest {
-    username: String,
-    password: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct LoginResponse {
-    success: bool,
-    message: String,
-    data: Option<LoginData>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct LoginData {
-    session_id: String,
-    requires_2fa: bool,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct ChallengeInitiateRequest {
-    session_id: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct ChallengeVerifyRequest {
-    session_id: String,
-    code: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct ChallengeVerifyResponse {
-    success: bool,
-    message: String,
-    data: Option<AuthData>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct AuthData {
-    access_token: String,
-    refresh_token: String,
-    expires_in: i64,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct DeviceBindRequest {
-    username: String,
-    fingerprint: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct ClientBootstrapRequest {
-    session_id: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct ClientBootstrapResponse {
-    fwknop: FwknopConfig,
-    stunnel: StunnelConfig,
-    openvpn: OpenVpnConfig,
-    browser: BrowserConfig,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct FwknopConfig {
-    remote_ip: String,
-    key_rijndael: String,
-    key_hmac: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct StunnelConfig {
-    server: String,
-    port: u16,
-    ca_pem: String,
-    client_cert: String,
-    client_key: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct OpenVpnConfig {
-    base_ovpn: String,
-    auth: OpenVpnAuth,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct OpenVpnAuth {
-    r#type: String,
-    username: String,
-    password: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct BrowserConfig {
-    policy: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct CreateUserRequest {
-    username: String,
-    email: String,
-    mobile: String,
-    policy_window: String,
-    device_binding: bool,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct UserData {
-    username: String,
-    email: String,
-    mobile: String,
-    status: String,
-    device_bound: bool,
-    created_at: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -148,6 +66,16 @@ struct SessionData {
     otp_code: Option<String>,
     otp_expires: Option<String>,
     access_token: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct UserData {
+    username: String,
+    email: String,
+    mobile: String,
+    status: String,
+    device_bound: bool,
+    created_at: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -184,50 +112,6 @@ struct VerificationRequest {
     location_lat: Option<f64>,
     location_lng: Option<f64>,
     created_at: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct DeviceRegistrationRequest {
-    user_id: String,
-    device_id: String,
-    fcm_token: Option<String>,
-    device_info: DeviceInfo,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct DeviceInfo {
-    model: String,
-    os: String,
-    app_version: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct VerificationCodeRequest {
-    request_id: String,
-    device_id: String,
-    location: Option<Location>,
-    network_info: Option<NetworkInfo>,
-    device_integrity_token: Option<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-struct Location {
-    latitude: f64,
-    longitude: f64,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-struct NetworkInfo {
-    ip: String,
-    carrier: Option<String>,
-    network_type: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct VerificationConfirmationRequest {
-    request_id: String,
-    approved: bool,
-    device_id: String,
 }
 
 // Helper functions
@@ -322,7 +206,7 @@ async fn login(req: web::Json<LoginRequest>) -> HttpResponse {
     }
 }
 
-async fn challenge_initiate(req: web::Json<ChallengeInitiateRequest>) -> HttpResponse {
+async fn challenge_initiate(req: web::Json<models::OtpVerifyRequest>) -> HttpResponse {
     let session_id = req.session_id.clone();
     
     println!("2FA challenge initiated for session: {}", session_id);
@@ -351,7 +235,7 @@ async fn challenge_initiate(req: web::Json<ChallengeInitiateRequest>) -> HttpRes
     }
 }
 
-async fn challenge_verify(req: web::Json<ChallengeVerifyRequest>) -> HttpResponse {
+async fn challenge_verify(req: web::Json<models::OtpVerifyRequest>) -> HttpResponse {
     let session_id = req.session_id.clone();
     let code = req.code.clone();
     
@@ -369,10 +253,10 @@ async fn challenge_verify(req: web::Json<ChallengeVerifyRequest>) -> HttpRespons
                 
                 log_event("2FA_VERIFIED", &format!("Session: {}", session_id));
                 
-                HttpResponse::Ok().json(ChallengeVerifyResponse {
+                HttpResponse::Ok().json(models::OtpVerifyResponse {
                     success: true,
             message: "2FA verification successful".to_string(),
-                    data: Some(AuthData {
+                    data: Some(models::AuthData {
                         access_token,
                         refresh_token,
                         expires_in: 900, // 15 minutes
@@ -380,21 +264,21 @@ async fn challenge_verify(req: web::Json<ChallengeVerifyRequest>) -> HttpRespons
                 })
             } else {
                 log_event("2FA_FAILED", &format!("Session: {}, Invalid code", session_id));
-                HttpResponse::Unauthorized().json(ChallengeVerifyResponse {
+                HttpResponse::Unauthorized().json(models::OtpVerifyResponse {
                     success: false,
                     message: "Invalid OTP code".to_string(),
                     data: None,
                 })
             }
         } else {
-            HttpResponse::BadRequest().json(ChallengeVerifyResponse {
+            HttpResponse::BadRequest().json(models::OtpVerifyResponse {
                 success: false,
                 message: "No OTP challenge found".to_string(),
                 data: None,
             })
         }
     } else {
-        HttpResponse::BadRequest().json(ChallengeVerifyResponse {
+        HttpResponse::BadRequest().json(models::OtpVerifyResponse {
             success: false,
             message: "Invalid session".to_string(),
             data: None,
@@ -402,7 +286,7 @@ async fn challenge_verify(req: web::Json<ChallengeVerifyRequest>) -> HttpRespons
     }
 }
 
-async fn device_bind_request(req: web::Json<DeviceBindRequest>) -> HttpResponse {
+async fn device_bind_request(req: web::Json<models::DeviceBindRequest>) -> HttpResponse {
     let username = req.username.clone();
     let fingerprint = req.fingerprint.clone();
     
@@ -425,35 +309,35 @@ async fn device_bind_request(req: web::Json<DeviceBindRequest>) -> HttpResponse 
     }))
 }
 
-async fn client_bootstrap(req: web::Json<ClientBootstrapRequest>) -> HttpResponse {
+async fn client_bootstrap(req: web::Json<models::ClientBootstrapRequest>) -> HttpResponse {
     let session_id = req.session_id.clone();
     
     println!("Client bootstrap request for session: {}", session_id);
     log_event("CLIENT_BOOTSTRAP", &format!("Session: {}", session_id));
     
     // Mock configuration data
-    let config = ClientBootstrapResponse {
-        fwknop: FwknopConfig {
+    let config = models::ClientBootstrapResponse {
+        fwknop: models::FwknopConfig {
             remote_ip: "185.231.180.118".to_string(),
             key_rijndael: "demo_rijndael_key_123456789".to_string(),
             key_hmac: "demo_hmac_key_987654321".to_string(),
         },
-        stunnel: StunnelConfig {
+        stunnel: models::StunnelConfig {
             server: "gw.viworks.com".to_string(),
             port: 8443,
             ca_pem: "-----BEGIN CERTIFICATE-----\nDEMO_CA_CERT\n-----END CERTIFICATE-----".to_string(),
             client_cert: "-----BEGIN CERTIFICATE-----\nDEMO_CLIENT_CERT\n-----END CERTIFICATE-----".to_string(),
             client_key: "-----BEGIN PRIVATE KEY-----\nDEMO_CLIENT_KEY\n-----END PRIVATE KEY-----".to_string(),
         },
-        openvpn: OpenVpnConfig {
+        openvpn: models::OpenVpnConfig {
             base_ovpn: "client\ndev tun\nproto tcp\nremote 127.0.0.1 9443\nresolv-retry infinite\nnobind\npersist-key\npersist-tun\nca ca.crt\ncert client.crt\nkey client.key\nremote-cert-tls server\ncipher AES-256-GCM\nauth SHA256\nkey-direction 1\nverb 3".to_string(),
-            auth: OpenVpnAuth {
+            auth: models::OpenVpnAuth {
                 r#type: "user-pass".to_string(),
                 username: "keyvan".to_string(),
                 password: "demo_vpn_password".to_string(),
             },
         },
-        browser: BrowserConfig {
+        browser: models::BrowserConfig {
             policy: "per-session".to_string(),
         },
     };
@@ -461,7 +345,7 @@ async fn client_bootstrap(req: web::Json<ClientBootstrapRequest>) -> HttpRespons
     HttpResponse::Ok().json(config)
 }
 
-async fn create_user(req: web::Json<CreateUserRequest>) -> HttpResponse {
+async fn create_user(req: web::Json<models::CreateUserRequest>) -> HttpResponse {
     let username = req.username.clone();
     let email = req.email.clone();
     let mobile = req.mobile.clone();
@@ -473,7 +357,7 @@ async fn create_user(req: web::Json<CreateUserRequest>) -> HttpResponse {
     users.insert(username.clone(), UserData {
         username: username.clone(),
         email: email.clone(),
-        mobile: mobile.clone(),
+        mobile: mobile.clone().unwrap_or_default(),
         status: "pending".to_string(),
         device_bound: false,
         created_at: Utc::now().to_rfc3339(),
@@ -640,18 +524,16 @@ async fn get_audit_logs() -> HttpResponse {
 }
 
 // Android-specific endpoints
-async fn register_device(req: web::Json<DeviceRegistrationRequest>) -> HttpResponse {
-    let user_id = req.user_id.clone();
-    let device_id = req.device_id.clone();
-    let fcm_token = req.fcm_token.clone();
-    let device_info = &req.device_info;
+async fn register_device(req: web::Json<models::DeviceBindRequest>) -> HttpResponse {
+    let username = req.username.clone();
+    let device_id = req.fingerprint.clone();
     
-    println!("Device registration request for user: {}, device: {}", user_id, device_id);
-    log_event("DEVICE_REGISTRATION", &format!("User: {}, Device: {}", user_id, device_id));
+    println!("Device registration request for user: {}, device: {}", username, device_id);
+    log_event("DEVICE_REGISTRATION", &format!("User: {}, Device: {}", username, device_id));
     
     // Check if user exists
     let users = USERS.lock().unwrap();
-    if !users.contains_key(&user_id) {
+    if !users.contains_key(&username) {
         return HttpResponse::NotFound().json(serde_json::json!({
             "success": false,
             "message": "User not found"
@@ -661,20 +543,20 @@ async fn register_device(req: web::Json<DeviceRegistrationRequest>) -> HttpRespo
     // Register device
     let device = UserDevice {
         id: Uuid::new_v4().to_string(),
-        user_id: user_id.clone(),
+        user_id: username.clone(),
         device_id: device_id.clone(),
-        fcm_token,
-        device_model: device_info.model.clone(),
-        device_os: device_info.os.clone(),
-        app_version: device_info.app_version.clone(),
+        fcm_token: None,
+        device_model: "Android Device".to_string(),
+        device_os: "Android".to_string(),
+        app_version: "1.0.0".to_string(),
         last_used_at: Utc::now().to_rfc3339(),
         created_at: Utc::now().to_rfc3339(),
     };
     
     let mut user_devices = USER_DEVICES.lock().unwrap();
-    user_devices.insert(format!("{}_{}", user_id, device_id), device);
+    user_devices.insert(format!("{}_{}", username, device_id), device);
     
-    log_event("DEVICE_REGISTERED", &format!("User: {}, Device: {}", user_id, device_id));
+    log_event("DEVICE_REGISTERED", &format!("User: {}, Device: {}", username, device_id));
     
     HttpResponse::Ok().json(serde_json::json!({
         "success": true,
@@ -683,11 +565,9 @@ async fn register_device(req: web::Json<DeviceRegistrationRequest>) -> HttpRespo
     }))
 }
 
-async fn get_verification_code(req: web::Json<VerificationCodeRequest>) -> HttpResponse {
-    let request_id = req.request_id.clone();
-    let device_id = req.device_id.clone();
-    let location = req.location.clone();
-    let network_info = req.network_info.clone();
+async fn get_verification_code(req: web::Json<serde_json::Value>) -> HttpResponse {
+    let request_id = req.get("request_id").and_then(|v| v.as_str()).unwrap_or("");
+    let device_id = req.get("device_id").and_then(|v| v.as_str()).unwrap_or("");
     
     println!("Verification code request for device: {}", device_id);
     log_event("VERIFICATION_CODE_REQUEST", &format!("Device: {}", device_id));
@@ -698,21 +578,21 @@ async fn get_verification_code(req: web::Json<VerificationCodeRequest>) -> HttpR
     
     // Create verification request
     let verification_request = VerificationRequest {
-        id: request_id.clone(),
+        id: request_id.to_string(),
         user_id: "admin".to_string(), // For demo, assume admin user
-        device_id: device_id.clone(),
+        device_id: device_id.to_string(),
         code: code.clone(),
         expires_at: expires_at.to_rfc3339(),
         approved: None,
         completed: false,
-        ip_address: network_info.as_ref().map(|n| n.ip.clone()),
-        location_lat: location.as_ref().map(|l| l.latitude),
-        location_lng: location.as_ref().map(|l| l.longitude),
+        ip_address: None,
+        location_lat: None,
+        location_lng: None,
         created_at: Utc::now().to_rfc3339(),
     };
     
     let mut verification_requests = VERIFICATION_REQUESTS.lock().unwrap();
-    verification_requests.insert(request_id.clone(), verification_request);
+    verification_requests.insert(request_id.to_string(), verification_request);
     
     log_event("VERIFICATION_CODE_GENERATED", &format!("Device: {}, Code: {}", device_id, code));
     
@@ -724,17 +604,17 @@ async fn get_verification_code(req: web::Json<VerificationCodeRequest>) -> HttpR
     }))
 }
 
-async fn confirm_verification(req: web::Json<VerificationConfirmationRequest>) -> HttpResponse {
-    let request_id = req.request_id.clone();
-    let approved = req.approved;
-    let device_id = req.device_id.clone();
+async fn confirm_verification(req: web::Json<serde_json::Value>) -> HttpResponse {
+    let request_id = req.get("request_id").and_then(|v| v.as_str()).unwrap_or("");
+    let approved = req.get("approved").and_then(|v| v.as_bool()).unwrap_or(false);
+    let device_id = req.get("device_id").and_then(|v| v.as_str()).unwrap_or("");
     
     println!("Verification confirmation for device: {}, approved: {}", device_id, approved);
     log_event("VERIFICATION_CONFIRMATION", &format!("Device: {}, Approved: {}", device_id, approved));
     
     // Update verification request
     let mut verification_requests = VERIFICATION_REQUESTS.lock().unwrap();
-    if let Some(request) = verification_requests.get_mut(&request_id) {
+    if let Some(request) = verification_requests.get_mut(request_id) {
         request.approved = Some(approved);
         request.completed = true;
         
@@ -774,11 +654,52 @@ async fn get_verification_requests() -> HttpResponse {
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    // Set up panic hook for debugging
+    setup_panic_hook();
+    
+    // Early logging
+    eprintln!("🚀 Starting ViWorkS Admin Backend (Enhanced Demo Version)");
+    eprintln!("Initializing application...");
+    
     // Initialize demo data
+    eprintln!("Initializing demo data...");
     init_demo_data();
+    eprintln!("Demo data initialized successfully");
     
     // Initialize logger
-    env_logger::init_from_env(env_logger::Env::new().default_filter_or("info"));
+    eprintln!("Initializing logger...");
+    init_logging();
+    eprintln!("Logger initialized successfully");
+    
+    // Try to initialize database (optional for now) - with timeout
+    let database = tokio::time::timeout(
+        std::time::Duration::from_secs(10),
+        async {
+            match Database::new().await {
+                Ok(db) => {
+                    eprintln!("✅ Database connected successfully");
+                    // Run migrations in background to avoid blocking startup
+                    let db_clone = db.clone();
+                    tokio::spawn(async move {
+                        if let Err(e) = db_clone.run_migrations().await {
+                            eprintln!("⚠️  Database migration failed: {}", e);
+                        } else {
+                            eprintln!("✅ Database migrations completed successfully");
+                        }
+                    });
+                    Some(db)
+                }
+                Err(e) => {
+                    eprintln!("⚠️  Database connection failed: {}", e);
+                    eprintln!("   Continuing with in-memory data...");
+                    None
+                }
+            }
+        }
+    ).await.unwrap_or_else(|_| {
+        eprintln!("⚠️  Database connection timed out, continuing with in-memory data...");
+        None
+    });
     
     println!("🚀 Starting ViWorkS Admin Backend (Enhanced Demo Version)");
     println!("Server will listen on 0.0.0.0:8081");
@@ -786,18 +707,21 @@ async fn main() -> std::io::Result<()> {
     let port = env::var("PORT").unwrap_or_else(|_| "8081".to_string());
     let bind_address = format!("0.0.0.0:{}", port);
     
+    eprintln!("Binding to: {}", bind_address);
     println!("Binding to: {}", bind_address);
     
-    HttpServer::new(|| {
-    let cors = Cors::default()
-        .allow_any_origin()
-        .allow_any_method()
-        .allow_any_header()
-        .max_age(3600);
-    
+    // Ensure the server stays running
+    let server = HttpServer::new(move || {
+        let cors = Cors::default()
+            .allow_any_origin()
+            .allow_any_method()
+            .allow_any_header()
+            .max_age(3600);
+        
         App::new()
             .wrap(cors)
             .wrap(middleware::Logger::default())
+            .app_data(web::Data::new(database.clone()))
             .route("/health", web::get().to(health))
             .route("/api/v1/auth/login", web::post().to(login))
             .route("/api/v1/auth/challenge/initiate", web::post().to(challenge_initiate))
@@ -853,6 +777,12 @@ async fn main() -> std::io::Result<()> {
             }))
     })
     .bind(&bind_address)?
-    .run()
-    .await
+    .shutdown_timeout(5)
+    .run();
+    
+    eprintln!("✅ HTTP server started successfully on {}", bind_address);
+    println!("✅ HTTP server started successfully on {}", bind_address);
+    
+    // This will block until the server is shut down
+    server.await
 }

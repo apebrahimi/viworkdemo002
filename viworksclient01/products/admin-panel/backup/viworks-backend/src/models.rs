@@ -1,240 +1,281 @@
 // Database models and data structures
 use serde::{Deserialize, Serialize};
+use sqlx::FromRow;
+use chrono::{DateTime, Utc};
 use uuid::Uuid;
-use chrono::{DateTime, Utc, NaiveDateTime};
-use sqlx::types::ipnetwork::IpNetwork;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, FromRow)]
 pub struct User {
     pub id: Uuid,
     pub username: String,
     pub email: String,
     pub password_hash: String,
-    pub role: String, // user_role enum as text
-    pub is_active: bool,
+    pub mobile: Option<String>,
+    pub status: UserStatus,
+    pub roles: serde_json::Value,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
     pub last_login_at: Option<DateTime<Utc>>,
     pub failed_login_attempts: i32,
     pub locked_until: Option<DateTime<Utc>>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UserRestriction {
-    pub id: Uuid,
-    pub user_id: Uuid,
-    pub allowed_days: serde_json::Value,
-    pub allowed_hours_start: String,
-    pub allowed_hours_end: String,
-    pub max_sessions: i32,
-    pub created_at: NaiveDateTime,
-    pub updated_at: NaiveDateTime,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Session {
-    pub id: Uuid,
-    pub user_id: Uuid,
-    pub token_hash: String,
-    pub expires_at: DateTime<Utc>,
-    pub created_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Client {
-    pub id: Uuid,
-    pub name: String,
-    pub platform: String,
-    pub version: String,
-    pub status: String, // client_status enum
-    pub ip_address: Option<IpNetwork>,
-    pub mac_address: Option<String>, // Changed from MacAddress to String
-    pub last_seen: Option<DateTime<Utc>>,
-    pub connection_count: i32,
-    pub total_connection_time: Option<String>, // INTERVAL type
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AuthLog {
-    pub id: Uuid,
-    pub user_id: Uuid,
-    pub action: String,
-    pub ip_address: Option<IpNetwork>,
-    pub user_agent: Option<String>,
-    pub details: Option<String>,
-    pub created_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ServerConfig {
-    pub id: Uuid,
-    pub server_ip: IpNetwork,
-    pub stunnel_port: i32,
-    pub openvpn_port: i32,
-    pub spa_port: i32,
-    pub is_active: bool,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SystemLog {
-    pub id: Uuid,
-    pub source: String,
-    pub level: String, // log_level enum
-    pub message: String,
-    pub details: Option<serde_json::Value>,
-    pub created_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AuditLog {
-    pub id: Uuid,
-    pub user_id: Option<Uuid>,
-    pub action: String,
-    pub resource_type: Option<String>,
-    pub resource_id: Option<Uuid>,
-    pub details: Option<serde_json::Value>,
-    pub ip_address: Option<IpNetwork>,
-    pub user_agent: Option<String>,
-    pub created_at: DateTime<Utc>,
-}
-
-// Legacy models for backward compatibility
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AdminUser {
-    pub id: Uuid,
-    pub username: String,
-    pub email: String,
-    pub password_hash: String,
-    pub first_name: Option<String>,
-    pub last_name: Option<String>,
-    pub role: UserRole,
-    pub status: UserStatus,
-    pub last_login: Option<DateTime<Utc>>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum UserRole {
-    Admin,
-    User,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, sqlx::Type)]
+#[sqlx(type_name = "user_status", rename_all = "lowercase")]
 pub enum UserStatus {
-    #[serde(rename = "active")]
     Active,
-    #[serde(rename = "inactive")]
     Inactive,
-    #[serde(rename = "suspended")]
+    Pending,
     Suspended,
 }
 
-impl From<String> for UserStatus {
-    fn from(s: String) -> Self {
-        match s.as_str() {
-            "active" => UserStatus::Active,
-            "inactive" => UserStatus::Inactive,
-            "suspended" => UserStatus::Suspended,
-            _ => UserStatus::Inactive, // default
-        }
-    }
+#[derive(Debug, Serialize, Deserialize, FromRow)]
+pub struct Session {
+    pub id: Uuid,
+    pub user_id: Uuid,
+    pub device_id: Option<Uuid>,
+    pub access_token: String,
+    pub refresh_token: Option<String>,
+    pub status: SessionStatus,
+    pub started_at: DateTime<Utc>,
+    pub expires_at: DateTime<Utc>,
+    pub last_activity_at: DateTime<Utc>,
+    pub ip_address: Option<String>,
+    pub user_agent: Option<String>,
+    pub policy_snapshot: Option<serde_json::Value>,
 }
 
-impl From<UserStatus> for String {
-    fn from(status: UserStatus) -> Self {
-        match status {
-            UserStatus::Active => "active".to_string(),
-            UserStatus::Inactive => "inactive".to_string(),
-            UserStatus::Suspended => "suspended".to_string(),
-        }
-    }
+#[derive(Debug, Serialize, Deserialize, sqlx::Type)]
+#[sqlx(type_name = "session_status", rename_all = "lowercase")]
+pub enum SessionStatus {
+    Active,
+    Expired,
+    Terminated,
 }
 
-impl std::fmt::Display for UserRole {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            UserRole::Admin => write!(f, "admin"),
-            UserRole::User => write!(f, "user"),
-        }
-    }
+#[derive(Debug, Serialize, Deserialize, FromRow)]
+pub struct DesktopDevice {
+    pub id: Uuid,
+    pub user_id: Uuid,
+    pub device_pubkey: String,
+    pub platform: String,
+    pub fingerprint: String,
+    pub enrolled_at: DateTime<Utc>,
+    pub last_used_at: DateTime<Utc>,
+    pub status: DeviceStatus,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ViWorkSClient {
+#[derive(Debug, Serialize, Deserialize, FromRow)]
+pub struct MobileDevice {
+    pub id: Uuid,
+    pub user_id: Uuid,
+    pub device_id: String,
+    pub fcm_token: Option<String>,
+    pub device_model: Option<String>,
+    pub device_os: Option<String>,
+    pub app_version: Option<String>,
+    pub bound_at: DateTime<Utc>,
+    pub last_used_at: DateTime<Utc>,
+    pub status: DeviceStatus,
+}
+
+#[derive(Debug, Serialize, Deserialize, sqlx::Type)]
+#[sqlx(type_name = "device_status", rename_all = "lowercase")]
+pub enum DeviceStatus {
+    Pending,
+    Approved,
+    Rejected,
+    Revoked,
+}
+
+#[derive(Debug, Serialize, Deserialize, FromRow)]
+pub struct OtpChallenge {
+    pub id: Uuid,
+    pub user_id: Uuid,
+    pub code_hash: String,
+    pub expires_at: DateTime<Utc>,
+    pub attempts: i32,
+    pub max_attempts: i32,
+    pub created_at: DateTime<Utc>,
+    pub used_at: Option<DateTime<Utc>>,
+    pub ip_address: Option<String>,
+    pub device_info: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Serialize, Deserialize, FromRow)]
+pub struct Policy {
     pub id: Uuid,
     pub name: String,
-    pub ip_address: Option<String>,
-    pub mac_address: Option<String>,
-    pub status: ClientStatus,
-    pub last_seen: Option<DateTime<Utc>>,
+    pub description: Option<String>,
+    pub rbac_roles: serde_json::Value,
+    pub abac_rules: serde_json::Value,
+    pub version: i32,
+    pub is_active: bool,
+    pub created_by: Option<Uuid>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum ClientStatus {
-    #[serde(rename = "online")]
-    Online,
-    #[serde(rename = "offline")]
-    Offline,
-    #[serde(rename = "connecting")]
-    Connecting,
-    #[serde(rename = "error")]
-    Error,
-}
-
-impl From<String> for ClientStatus {
-    fn from(s: String) -> Self {
-        match s.as_str() {
-            "online" => ClientStatus::Online,
-            "offline" => ClientStatus::Offline,
-            "connecting" => ClientStatus::Connecting,
-            "error" => ClientStatus::Error,
-            _ => ClientStatus::Offline, // default
-        }
-    }
-}
-
-impl From<ClientStatus> for String {
-    fn from(status: ClientStatus) -> Self {
-        match status {
-            ClientStatus::Online => "online".to_string(),
-            ClientStatus::Offline => "offline".to_string(),
-            ClientStatus::Connecting => "connecting".to_string(),
-            ClientStatus::Error => "error".to_string(),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ConnectionLog {
+#[derive(Debug, Serialize, Deserialize, FromRow)]
+pub struct AuditEvent {
     pub id: Uuid,
-    pub client_id: Uuid,
-    pub event_type: String,
+    pub event_type: AuditEventType,
+    pub user_id: Option<Uuid>,
+    pub session_id: Option<Uuid>,
+    pub target_user_id: Option<Uuid>,
     pub details: serde_json::Value,
-    pub timestamp: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SecurityAlert {
-    pub id: Uuid,
-    pub severity: AlertSeverity,
-    pub title: String,
-    pub description: String,
-    pub is_resolved: bool,
+    pub ip_address: Option<String>,
+    pub user_agent: Option<String>,
     pub created_at: DateTime<Utc>,
-    pub resolved_at: Option<DateTime<Utc>>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum AlertSeverity {
-    Low,
-    Medium,
-    High,
-    Critical,
+#[derive(Debug, Serialize, Deserialize, sqlx::Type)]
+#[sqlx(type_name = "audit_event_type", rename_all = "lowercase")]
+pub enum AuditEventType {
+    LoginSuccess,
+    LoginFailed,
+    Logout,
+    UserCreated,
+    UserUpdated,
+    UserDeleted,
+    DeviceBound,
+    DeviceUnbound,
+    SessionStarted,
+    SessionTerminated,
+    PolicyUpdated,
+    AdminAction,
+}
+
+#[derive(Debug, Serialize, Deserialize, FromRow)]
+pub struct DeviceBindingRequest {
+    pub id: Uuid,
+    pub user_id: Uuid,
+    pub device_type: String,
+    pub fingerprint: String,
+    pub device_info: serde_json::Value,
+    pub status: DeviceStatus,
+    pub requested_at: DateTime<Utc>,
+    pub approved_at: Option<DateTime<Utc>>,
+    pub approved_by: Option<Uuid>,
+    pub expires_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, Deserialize, FromRow)]
+pub struct VerificationRequest {
+    pub id: Uuid,
+    pub user_id: Uuid,
+    pub device_id: String,
+    pub code: String,
+    pub expires_at: DateTime<Utc>,
+    pub approved: Option<bool>,
+    pub completed: bool,
+    pub ip_address: Option<String>,
+    pub location_lat: Option<f64>,
+    pub location_lng: Option<f64>,
+    pub network_info: Option<serde_json::Value>,
+    pub created_at: DateTime<Utc>,
+}
+
+// Request/Response DTOs
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CreateUserRequest {
+    pub username: String,
+    pub email: String,
+    pub password: String,
+    pub mobile: Option<String>,
+    pub roles: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct LoginRequest {
+    pub username: String,
+    pub password: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct LoginResponse {
+    pub success: bool,
+    pub message: String,
+    pub data: Option<LoginData>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct LoginData {
+    pub session_id: String,
+    pub requires_2fa: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct OtpVerifyRequest {
+    pub session_id: String,
+    pub code: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct OtpVerifyResponse {
+    pub success: bool,
+    pub message: String,
+    pub data: Option<AuthData>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AuthData {
+    pub access_token: String,
+    pub refresh_token: String,
+    pub expires_in: i64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DeviceBindRequest {
+    pub username: String,
+    pub fingerprint: String,
+    pub device_type: String,
+    pub device_info: serde_json::Value,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ClientBootstrapRequest {
+    pub session_id: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ClientBootstrapResponse {
+    pub fwknop: FwknopConfig,
+    pub stunnel: StunnelConfig,
+    pub openvpn: OpenVpnConfig,
+    pub browser: BrowserConfig,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct FwknopConfig {
+    pub remote_ip: String,
+    pub key_rijndael: String,
+    pub key_hmac: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct StunnelConfig {
+    pub server: String,
+    pub port: u16,
+    pub ca_pem: String,
+    pub client_cert: String,
+    pub client_key: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct OpenVpnConfig {
+    pub base_ovpn: String,
+    pub auth: OpenVpnAuth,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct OpenVpnAuth {
+    pub r#type: String,
+    pub username: String,
+    pub password: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct BrowserConfig {
+    pub policy: String,
 }

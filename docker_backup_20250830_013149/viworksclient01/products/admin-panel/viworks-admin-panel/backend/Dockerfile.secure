@@ -1,13 +1,16 @@
+# Multi-stage build with Alpine-based images for better security
 # Build stage
 FROM rust:1.89.0-alpine as builder
-
-WORKDIR /app
 
 # Install build dependencies
 RUN apk add --no-cache \
     pkgconfig \
     openssl-dev \
-    
+    postgresql-dev \
+    musl-dev \
+    gcc
+
+WORKDIR /app
 
 # Copy Cargo files first for better caching
 COPY Cargo.toml Cargo.lock* ./
@@ -25,35 +28,6 @@ COPY src ./src
 # Build the application
 RUN cargo build --release
 
-# Runtime stage
-FROM alpine:3.22
-
-# Install runtime dependencies
-RUN apk add --no-cache \
-    ca-certificates \
-    
-
-WORKDIR /app
-
-# Copy the binary
-COPY --from=builder /app/target/release/viworks-admin-backend /app/viworks-admin-backend
-
-# Make it executable
-RUN chmod +x /app/viworks-admin-backend
-
-# Create a non-root user
-RUN useradd -r -s /bin/false appuser && chown -R appuser:appuser /app
-USER appuser
-
-# Expose port
-EXPOSE 8081
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:8081/health || exit 1
-
-# Run the binary
-CMD ["/app/viworks-admin-backend"]
 # Production stage - Use Alpine for minimal attack surface
 FROM alpine:3.22 as production
 
@@ -71,10 +45,10 @@ RUN addgroup -g 1001 -S appgroup && \
 WORKDIR /app
 
 # Copy the binary from builder stage
-COPY --from=builder /app/target/release/* /app/
+COPY --from=builder /app/target/release/viworks-admin-backend /app/viworks-admin-backend
 
 # Change ownership to non-root user
-RUN chown -R appuser:appgroup /app
+RUN chown appuser:appgroup /app/viworks-admin-backend
 
 # Switch to non-root user
 USER appuser
@@ -88,4 +62,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
 
 # Use dumb-init for proper signal handling
 ENTRYPOINT ["dumb-init", "--"]
-CMD ["/app/viworks-backend"]
+CMD ["/app/viworks-admin-backend"]
