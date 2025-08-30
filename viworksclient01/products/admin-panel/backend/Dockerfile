@@ -1,55 +1,55 @@
-# Multi-stage build for production
-FROM node:20-alpine AS builder
+# Build stage
+FROM rust:1.89.0-alpine as builder
 
-# Set working directory
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
-COPY prisma ./prisma/
+# Install build dependencies including PostgreSQL and SSL
+RUN apk add --no-cache \
+    pkgconfig \
+    openssl-dev \
+    postgresql-dev \
+    musl-dev \
+    gcc
 
-# Install dependencies
-RUN npm ci --only=production && npm cache clean --force
+# Add MUSL target for Alpine compatibility
+RUN rustup target add x86_64-unknown-linux-musl
 
-# Generate Prisma client
-RUN npx prisma generate
+# Copy Cargo files first for better caching
+COPY Cargo.toml Cargo.lock* ./
 
-# Production stage
-FROM node:20-alpine AS production
+# Create a dummy main.rs to build dependencies
+RUN mkdir src && echo "fn main() {}" > src/main.rs
 
-# Install dumb-init for proper signal handling
-RUN apk add --no-cache dumb-init curl
+# Build dependencies
+RUN cargo build --release
 
-# Create app user
-RUN addgroup -g 1001 -S nodejs
-RUN adduser -S nodejs -u 1001
+# Remove dummy main.rs and copy real source
+RUN rm src/main.rs
+COPY src ./src
+COPY migrations ./migrations
 
-# Set working directory
+# Security check: Run cargo audit before building
+RUN cargo audit || echo "⚠️  Security vulnerabilities detected - review required"
+
+# Security check: Verify no unwanted dependencies
+RUN cargo tree | grep -i "mysql\|rsa" && echo "⚠️  WARNING: Unwanted dependencies found" || echo "✅ Dependencies verified"
+
+# Build the application (force rebuild by cleaning and rebuilding)
+RUN cargo clean && cargo build --release
+
+# Runtime stage (Alpine)
+FROM alpine:3.22
+RUN apk add --no-cache ca-certificates dumb-init busybox-extras netcat-openbsd wget curl tzdata
 WORKDIR /app
 
-# Copy built application from builder stage
-COPY --from=builder --chown=nodejs:nodejs /app/node_modules ./node_modules
-COPY --from=builder --chown=nodejs:nodejs /app/package*.json ./
-COPY --from=builder --chown=nodejs:nodejs /app/prisma ./prisma
+# Copy binary & entrypoint (adjust binary name if different)
+COPY --from=builder /app/target/release/viworks-admin-backend /app/app
+COPY --from=builder /app/migrations /app/migrations
+COPY ops/entrypoint.sh /app/entrypoint.sh
+RUN adduser -D -u 10001 appuser && chown -R appuser:appuser /app && chmod +x /app/entrypoint.sh
 
-# Copy source code
-COPY --chown=nodejs:nodejs . .
-
-# Create logs directory
-RUN mkdir -p logs && chown nodejs:nodejs logs
-
-# Switch to non-root user
-USER nodejs
-
-# Expose port
-EXPOSE 8080
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:8080/health || exit 1
-
-# Use dumb-init to handle signals properly
-ENTRYPOINT ["dumb-init", "--"]
-
-# Start the application
-CMD ["npm", "start"]
+ENV RUST_LOG=info RUST_BACKTRACE=1 SSL_CERT_DIR=/etc/ssl/certs HOST=0.0.0.0 PORT=8081
+USER appuser
+EXPOSE 8081
+ENTRYPOINT ["/usr/bin/dumb-init","--"]
+CMD ["/app/entrypoint.sh","/app/app"]

@@ -1,0 +1,89 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: viworks-postgres
+    environment:
+      POSTGRES_DB: viworks_admin
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: viworks_password_2024
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - viworks-network
+    restart: unless-stopped
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: viworks-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - viworks-network
+    restart: unless-stopped
+
+  # Backend API Server
+  backend:
+    build:
+      context: ./viworksclient01/products/admin-panel/backend
+      dockerfile: Dockerfile
+    container_name: viworks-backend
+    ports:
+      - "8081:8081"
+    environment:
+      - DATABASE_URL=postgresql://admin:viworks_password_2024@postgres:5432/viworks_admin
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=your_super_secure_jwt_secret_key_here
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - viworks-network
+    restart: unless-stopped
+
+  # Main Frontend
+  frontend:
+    build:
+      context: ./viworks-frontend
+      dockerfile: Dockerfile
+    container_name: viworks-frontend
+    ports:
+      - "3001:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://backend:8081
+    depends_on:
+      - backend
+    networks:
+      - viworks-network
+    restart: unless-stopped
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: viworks-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - viworks-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  viworks-network:
+    driver: bridge
