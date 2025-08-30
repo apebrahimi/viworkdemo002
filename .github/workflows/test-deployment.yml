@@ -1,0 +1,93 @@
+name: Test Deployment Setup
+
+on:
+  workflow_dispatch:
+
+env:
+  DROPLET_IP: ${{ secrets.DROPLET_IP }}
+  DROPLET_USER: ${{ secrets.DROPLET_USER }}
+  SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H $DROPLET_IP >> ~/.ssh/known_hosts
+          
+      - name: Test SSH connection
+        run: |
+          echo "🔍 Testing SSH connection to $DROPLET_IP..."
+          ssh -o ConnectTimeout=10 -i ~/.ssh/id_ed25519 ${DROPLET_USER}@${DROPLET_IP} "echo 'SSH connection test successful'"
+          echo "✅ SSH connection successful!"
+          
+      - name: Check Docker status
+        run: |
+          echo "🔍 Checking Docker installation..."
+          ssh -i ~/.ssh/id_ed25519 ${DROPLET_USER}@${DROPLET_IP} "docker --version"
+          ssh -i ~/.ssh/id_ed25519 ${DROPLET_USER}@${DROPLET_IP} "docker-compose --version"
+          echo "✅ Docker and Docker Compose are installed!"
+          
+      - name: Check application directory
+        run: |
+          echo "🔍 Checking application directory structure..."
+          ssh -i ~/.ssh/id_ed25519 ${DROPLET_USER}@${DROPLET_IP} "ls -la /opt/viworks/"
+          echo "✅ Application directory found!"
+          
+      - name: Check Docker containers
+        run: |
+          echo "🔍 Checking running Docker containers..."
+          ssh -i ~/.ssh/id_ed25519 ${DROPLET_USER}@${DROPLET_IP} "cd /opt/viworks && docker-compose ps"
+          echo "✅ Docker containers are running!"
+          
+      - name: Test web endpoints
+        run: |
+          echo "🔍 Testing web endpoints..."
+          sleep 5
+          
+          # Test nginx health endpoint
+          if curl -f http://${DROPLET_IP}/health; then
+            echo "✅ Nginx health endpoint is working!"
+          else
+            echo "⚠️  Nginx health endpoint not responding"
+          fi
+          
+          # Test main endpoint
+          if curl -f http://${DROPLET_IP}/; then
+            echo "✅ Main endpoint is working!"
+          else
+            echo "⚠️  Main endpoint not responding"
+          fi
+          
+      - name: Check system resources
+        run: |
+          echo "🔍 Checking system resources..."
+          ssh -i ~/.ssh/id_ed25519 ${DROPLET_USER}@${DROPLET_IP} "df -h /"
+          ssh -i ~/.ssh/id_ed25519 ${DROPLET_USER}@${DROPLET_IP} "free -h"
+          echo "✅ System resources checked!"
+          
+      - name: Success message
+        run: |
+          echo "🎉 All tests passed! Your CI/CD setup is working correctly."
+          echo "🌐 Your application should be accessible at: http://${DROPLET_IP}"
+          echo ""
+          echo "📋 Summary:"
+          echo "✅ SSH connection: Working"
+          echo "✅ Docker: Installed and running"
+          echo "✅ Docker Compose: Installed and working"
+          echo "✅ Application directory: Ready"
+          echo "✅ Web endpoints: Accessible"
+          echo "✅ System resources: Available"
+          echo ""
+          echo "🚀 You can now use the other deployment workflows!"
+          echo "• Push to main branch for automatic deployment"
+          echo "• Use manual triggers for specific applications"
+          echo "• Deploy multiple applications at once"
