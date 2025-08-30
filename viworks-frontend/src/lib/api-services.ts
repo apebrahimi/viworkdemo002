@@ -24,10 +24,14 @@ import {
 // Authentication API
 export const authApi = {
   login: async (credentials: LoginCredentials): Promise<LoginResponse> => {
+    console.log('API service: Making login request to:', '/api/v1/auth/login');
+    console.log('API service: Credentials:', credentials);
+    
     const response = await api.post<any>('/api/v1/auth/login', credentials);
+    console.log('API service: Raw response:', response);
     
     // Transform enhanced backend response to match expected format
-    return {
+    const transformedResponse = {
       success: response.success,
       message: response.message,
       token: response.data?.data?.session_id || 'demo_token',
@@ -42,6 +46,9 @@ export const authApi = {
         last_login: new Date().toISOString(),
       }
     };
+    
+    console.log('API service: Transformed response:', transformedResponse);
+    return transformedResponse;
   },
 
   logout: async (): Promise<void> => {
