@@ -22,11 +22,23 @@ jobs:
           echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -H $DROPLET_IP >> ~/.ssh/known_hosts
+          echo "SSH key setup completed"
+          echo "SSH key permissions: $(ls -la ~/.ssh/id_ed25519)"
+          
+      - name: Debug connection info
+        run: |
+          echo "🔍 Debug Information:"
+          echo "Droplet IP: $DROPLET_IP"
+          echo "Droplet User: $DROPLET_USER"
+          echo "SSH key exists: $(test -f ~/.ssh/id_ed25519 && echo 'YES' || echo 'NO')"
+          echo "SSH key size: $(wc -c < ~/.ssh/id_ed25519) bytes"
+          echo "Testing connectivity to $DROPLET_IP:22..."
+          timeout 10 bash -c "</dev/tcp/$DROPLET_IP/22" && echo "✅ Port 22 is reachable" || echo "❌ Port 22 is not reachable"
           
       - name: Test SSH connection
         run: |
           echo "🔍 Testing SSH connection to $DROPLET_IP..."
-          ssh -o ConnectTimeout=10 -i ~/.ssh/id_ed25519 ${DROPLET_USER}@${DROPLET_IP} "echo 'SSH connection test successful'"
+          ssh -v -o ConnectTimeout=30 -o BatchMode=yes -i ~/.ssh/id_ed25519 ${DROPLET_USER}@${DROPLET_IP} "echo 'SSH connection test successful'"
           echo "✅ SSH connection successful!"
           
       - name: Check Docker status
