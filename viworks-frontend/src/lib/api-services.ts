@@ -30,7 +30,7 @@ export const authApi = {
     return {
       success: response.success,
       message: response.message,
-      token: response.data?.session_id || 'demo_token',
+      token: response.data?.data?.session_id || 'demo_token',
       refresh_token: 'demo_refresh_token',
       user: {
         id: 'demo_user_id',
