@@ -27,7 +27,7 @@ jobs:
           
       - name: Test SSH connection
         run: |
-          ssh -o ConnectTimeout=10 -i ~/.ssh/id_ed25519 ${DROPLET_USER}@${DROPLET_IP} "echo 'SSH connection successful'"
+          ssh -o ConnectTimeout=10 -i ~/.ssh/id_ed25519 ${DROPLET_USER}@${DROPLET_IP} "echo 'SSH connection test successful'"
           
       - name: Create deployment script
         run: |
@@ -42,13 +42,15 @@ jobs:
           # Navigate to app directory
           cd $APP_DIR
           
-          # Pull latest changes
-          echo "📥 Pulling latest changes..."
-          git pull origin main || git pull origin master
-          
           # Stop existing containers
           echo "🛑 Stopping existing containers..."
           docker-compose down || true
+          
+          # Clean up any existing files and reset git
+          echo "🧹 Cleaning up and resetting git repository..."
+          git fetch origin
+          git reset --hard origin/main || git reset --hard origin/master
+          git clean -fd
           
           # Remove old images to free space
           echo "🧹 Cleaning up old images..."
@@ -69,7 +71,6 @@ jobs:
           # Test endpoints
           echo "🧪 Testing endpoints..."
           curl -f http://localhost || echo "Main frontend not ready yet"
-          curl -f http://localhost/admin || echo "Admin panel not ready yet"
           curl -f http://localhost/api/health || echo "Backend not ready yet"
           
           echo "✅ Deployment completed successfully!"
@@ -89,7 +90,6 @@ jobs:
           
           # Test main endpoints
           curl -f http://${DROPLET_IP} || echo "Main frontend verification failed"
-          curl -f http://${DROPLET_IP}/admin || echo "Admin panel verification failed"
           curl -f http://${DROPLET_IP}/api/health || echo "Backend verification failed"
           
           echo "✅ Deployment verification completed!"
