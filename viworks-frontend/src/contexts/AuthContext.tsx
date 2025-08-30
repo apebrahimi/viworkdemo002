@@ -40,8 +40,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const token = localStorage.getItem('auth_token');
         if (token) {
           // Verify token and get current user
-          const currentUser = await authApi.getCurrentUser();
-          setUser(currentUser);
+          try {
+            const currentUser = await authApi.getCurrentUser();
+            setUser(currentUser);
+          } catch (error) {
+            console.error('Failed to get current user:', error);
+            // Clear invalid tokens
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('refresh_token');
+            localStorage.removeItem('user');
+          }
         }
       } catch (error) {
         console.error('Failed to initialize auth:', error);
