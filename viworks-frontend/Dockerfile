@@ -33,9 +33,11 @@ WORKDIR /app
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# Create public directory and copy if it exists
+# Create public directory
 RUN mkdir -p ./public
-COPY --from=builder --chown=nextjs:nodejs /app/public/* ./public/ 2>/dev/null || true
+
+# Copy public files if they exist (this will fail silently if directory is empty)
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 
 # Switch to non-root user
 USER nextjs
