@@ -52,6 +52,9 @@ jobs:
           git reset --hard origin/main || git reset --hard origin/master
           git clean -fd
           
+          # Navigate to the clean docker setup
+          cd "digital ocean docker"
+          
           # Remove old images to free space
           echo "🧹 Cleaning up old images..."
           docker image prune -f
@@ -70,8 +73,8 @@ jobs:
           
           # Test endpoints
           echo "🧪 Testing endpoints..."
-          curl -f http://localhost || echo "Main frontend not ready yet"
-          curl -f http://localhost/api/health || echo "Backend not ready yet"
+          curl -f http://localhost:3000 || echo "Frontend not ready yet"
+          curl -f http://localhost:8081/health || echo "Backend not ready yet"
           
           echo "✅ Deployment completed successfully!"
           EOF
@@ -89,8 +92,8 @@ jobs:
           sleep 10
           
           # Test main endpoints
-          curl -f http://${DROPLET_IP} || echo "Main frontend verification failed"
-          curl -f http://${DROPLET_IP}/api/health || echo "Backend verification failed"
+          curl -f http://${DROPLET_IP}:3000 || echo "Frontend verification failed"
+          curl -f http://${DROPLET_IP}:8081/health || echo "Backend verification failed"
           
           echo "✅ Deployment verification completed!"
           
@@ -98,7 +101,10 @@ jobs:
         if: always()
         run: |
           if [ ${{ job.status }} == 'success' ]; then
-            echo "🎉 Deployment successful! Your application is live at http://${DROPLET_IP}"
+            echo "🎉 Deployment successful! Your application is now live."
+            echo "🌐 Frontend: http://${DROPLET_IP}:3000"
+            echo "🔧 Backend: http://${DROPLET_IP}:8081"
+            echo "📊 Health: http://${DROPLET_IP}:8081/health"
           else
             echo "❌ Deployment failed. Check the logs above for details."
           fi
