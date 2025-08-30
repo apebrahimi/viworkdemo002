@@ -6,13 +6,19 @@ services:
     environment:
       POSTGRES_DB: viworks_admin
       POSTGRES_USER: admin
-      POSTGRES_PASSWORD: viworks_password_2024
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-viworks_password_2024}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - viworks-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d viworks_admin"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
 
   # Redis Cache
@@ -25,9 +31,14 @@ services:
       - redis_data:/data
     networks:
       - viworks-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
 
-  # Backend API Server
+  # Backend API Server (Rust)
   backend:
     build:
       context: ./viworksclient01/products/admin-panel/backend
@@ -35,32 +46,44 @@ services:
     container_name: viworks-backend
     ports:
       - "8081:8081"
-    environment:
-      - DATABASE_URL=postgresql://admin:viworks_password_2024@postgres:5432/viworks_admin
-      - REDIS_URL=redis://redis:6379
-      - JWT_SECRET=your_super_secure_jwt_secret_key_here
+    env_file:
+      - ./env.production
+    volumes:
+      - ./viworksclient01/products/admin-panel/backend/logs:/app/logs
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - viworks-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
-  # Main Frontend
+  # Frontend Next.js App
   frontend:
     build:
       context: ./viworks-frontend
       dockerfile: Dockerfile
     container_name: viworks-frontend
     ports:
-      - "3001:3000"
-    environment:
-      - NEXT_PUBLIC_API_URL=http://backend:8081
+      - "3000:3000"
+    env_file:
+      - ./env.production
     depends_on:
       - backend
     networks:
       - viworks-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # Nginx Reverse Proxy
   nginx:
@@ -71,6 +94,7 @@ services:
       - "443:443"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/ssl:/etc/nginx/ssl
     depends_on:
       - frontend
       - backend
