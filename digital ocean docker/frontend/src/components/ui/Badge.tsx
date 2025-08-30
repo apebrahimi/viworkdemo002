@@ -14,10 +14,10 @@ export const Badge: React.FC<BadgeProps> = ({
   const baseClasses = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium';
   
   const variantClasses = {
-    default: 'bg-gray-100 text-gray-800',
-    success: 'bg-green-100 text-green-800',
-    destructive: 'bg-red-100 text-red-800',
-    outline: 'border border-gray-300 text-gray-700',
+    default: 'bg-muted text-muted-foreground',
+    success: 'bg-green-500/10 text-green-600 border border-green-500/20 dark:bg-green-900/20 dark:text-green-400 dark:border-green-700/30',
+    destructive: 'bg-red-500/10 text-red-600 border border-red-500/20 dark:bg-red-900/20 dark:text-red-400 dark:border-red-700/30',
+    outline: 'border border-border text-foreground',
   };
   
   const classes = `${baseClasses} ${variantClasses[variant]} ${className}`;
