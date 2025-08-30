@@ -526,7 +526,7 @@ async fn ws_handler(req: HttpRequest, stream: web::Payload) -> Result<HttpRespon
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    // Initialize logging first (following troubleshooting guide)
+    // Initialize logging
     env_logger::init();
     log::info!("🚀 Starting ViWorkS Admin Backend...");
     
@@ -536,15 +536,7 @@ async fn main() -> std::io::Result<()> {
         std::process::exit(1);
     }));
     
-    // Initialize tracing
-    tracing_subscriber::registry()
-        .with(tracing_subscriber::EnvFilter::new(
-            std::env::var("RUST_LOG").unwrap_or_else(|_| "info".into()),
-        ))
-        .with(tracing_subscriber::fmt::layer())
-        .init();
-    
-    info!("📊 Initializing database connection...");
+    log::info!("📊 Initializing database connection...");
     
     // Database connection
     let database_url = std::env::var("DATABASE_URL")
@@ -554,8 +546,8 @@ async fn main() -> std::io::Result<()> {
         .await
         .expect("Failed to connect to database");
     
-    info!("✅ Database connected successfully");
-    info!("🌐 Starting HTTP server on 0.0.0.0:8080...");
+    log::info!("✅ Database connected successfully");
+    log::info!("🌐 Starting HTTP server on 0.0.0.0:8081...");
     
     HttpServer::new(move || {
         let cors = Cors::default()
