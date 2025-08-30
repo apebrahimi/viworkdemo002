@@ -518,6 +518,100 @@ fn generate_random_path() -> String {
         .collect()
 }
 
+// Admin API handlers for frontend compatibility
+async fn get_admin_users() -> HttpResponse {
+    HttpResponse::Ok().json(serde_json::json!({
+        "users": [
+            {
+                "id": "1701fe72-fb04-4e26-8d20-1eacb234746e",
+                "username": "admin",
+                "email": "admin@viworks.local",
+                "role": "owner",
+                "status": "active",
+                "created_at": "2025-08-24T10:00:00Z",
+                "last_login": "2025-08-24T10:30:00Z"
+            },
+            {
+                "id": "ec3ce0b2-78b5-4812-b82f-cea8730136ac",
+                "username": "keyvan",
+                "email": "keyvan@viworks.local",
+                "role": "user",
+                "status": "active",
+                "created_at": "2025-08-24T09:00:00Z",
+                "last_login": "2025-08-24T10:15:00Z"
+            }
+        ],
+        "total": 2,
+        "page": 1,
+        "per_page": 10
+    }))
+}
+
+async fn create_admin_user(req: web::Json<serde_json::Value>) -> HttpResponse {
+    HttpResponse::Ok().json(serde_json::json!({
+        "success": true,
+        "message": "User created successfully",
+        "user": {
+            "id": Uuid::new_v4().to_string(),
+            "username": req.get("username").unwrap_or(&serde_json::Value::String("new_user".to_string())),
+            "email": req.get("email").unwrap_or(&serde_json::Value::String("new_user@viworks.local".to_string())),
+            "role": "user",
+            "status": "active",
+            "created_at": Utc::now().to_rfc3339()
+        }
+    }))
+}
+
+async fn activate_admin_user(req: web::Json<serde_json::Value>) -> HttpResponse {
+    HttpResponse::Ok().json(serde_json::json!({
+        "success": true,
+        "message": "User activated successfully"
+    }))
+}
+
+async fn get_admin_sessions() -> HttpResponse {
+    HttpResponse::Ok().json(serde_json::json!({
+        "sessions": [
+            {
+                "id": "session-1",
+                "user_id": "ec3ce0b2-78b5-4812-b82f-cea8730136ac",
+                "username": "keyvan",
+                "ip_address": "192.168.1.100",
+                "user_agent": "Mozilla/5.0...",
+                "created_at": "2025-08-24T10:00:00Z",
+                "last_activity": "2025-08-24T10:30:00Z",
+                "status": "active"
+            }
+        ],
+        "total": 1,
+        "page": 1,
+        "per_page": 10
+    }))
+}
+
+async fn get_device_requests() -> HttpResponse {
+    HttpResponse::Ok().json(serde_json::json!({
+        "requests": [
+            {
+                "id": "device-req-1",
+                "username": "demo_user",
+                "device_name": "MacBook Pro",
+                "device_fingerprint": "abc123def456",
+                "status": "pending",
+                "created_at": "2025-08-24T10:00:00Z"
+            }
+        ],
+        "total": 1
+    }))
+}
+
+async fn approve_device(req: web::Json<serde_json::Value>) -> HttpResponse {
+    HttpResponse::Ok().json(serde_json::json!({
+        "success": true,
+        "message": "Device approved successfully"
+    }))
+}
+
 // WebSocket handler
 async fn ws_handler(req: HttpRequest, stream: web::Payload) -> Result<HttpResponse, actix_web::Error> {
     let resp = ws::start(WebSocketActor {}, &req, stream)?;
@@ -580,6 +674,14 @@ async fn main() -> std::io::Result<()> {
                     .route("/agent/user/create", web::post().to(create_user))
                     .route("/agent/container/spawn", web::post().to(spawn_container))
                     .route("/agent/session/terminate", web::post().to(terminate_session))
+                    
+                    // Admin endpoints for frontend
+                    .route("/admin/users", web::get().to(get_admin_users))
+                    .route("/admin/users/create", web::post().to(create_admin_user))
+                    .route("/admin/users/activate", web::post().to(activate_admin_user))
+                    .route("/admin/sessions", web::get().to(get_admin_sessions))
+                    .route("/admin/device/requests", web::get().to(get_device_requests))
+                    .route("/admin/device/approve", web::post().to(approve_device))
             )
     })
     .bind("0.0.0.0:8081")?

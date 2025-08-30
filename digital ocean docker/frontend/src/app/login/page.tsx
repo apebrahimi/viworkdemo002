@@ -147,11 +147,7 @@ export default function LoginPage() {
             </button>
           </div>
 
-          <div className="text-center">
-            <p className="text-xs text-gray-500">
-              Demo credentials: admin / admin123 or keyvan / demo123
-            </p>
-          </div>
+
         </form>
       </div>
     </div>
