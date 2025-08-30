@@ -96,6 +96,7 @@ public
 # Temporary folders
 tmp/
 temp/
+0 temp/
 
 # Rust specific
 Cargo.lock
