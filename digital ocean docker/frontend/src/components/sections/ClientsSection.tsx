@@ -71,15 +71,15 @@ export function ClientsSection() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'online':
-        return 'bg-green-500/10 text-green-600 border-green-500/20';
+        return 'bg-green-500/10 text-green-600 border-green-500/20 dark:bg-green-500/20 dark:text-green-400 dark:border-green-500/30';
       case 'offline':
-        return 'bg-gray-500/10 text-gray-600 border-gray-500/20';
+        return 'bg-gray-500/10 text-gray-600 border-gray-500/20 dark:bg-gray-500/20 dark:text-gray-400 dark:border-gray-500/30';
       case 'connecting':
-        return 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20';
+        return 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20 dark:bg-yellow-500/20 dark:text-yellow-400 dark:border-yellow-500/30';
       case 'error':
-        return 'bg-red-500/10 text-red-600 border-red-500/20';
+        return 'bg-red-500/10 text-red-600 border-red-500/20 dark:bg-red-500/20 dark:text-red-400 dark:border-red-500/30';
       default:
-        return 'bg-gray-500/10 text-gray-600 border-gray-500/20';
+        return 'bg-gray-500/10 text-gray-600 border-gray-500/20 dark:bg-gray-500/20 dark:text-gray-400 dark:border-gray-500/30';
     }
   };
 
@@ -88,8 +88,8 @@ export function ClientsSection() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className={isRTL ? 'text-right' : 'text-left'}>
-          <h1 className="text-2xl font-bold text-foreground">مدیریت کلاینت‌ها</h1>
-          <p className="text-muted-foreground">مدیریت و نظارت بر کلاینت‌های VPN</p>
+          <h1 className="text-2xl font-bold text-foreground">{t('clientsManagement', language)}</h1>
+          <p className="text-muted-foreground">{t('clientsManagementDesc', language)}</p>
         </div>
         <div className="flex items-center gap-3">
           <button
@@ -97,7 +97,7 @@ export function ClientsSection() {
             className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
           >
             <Plus className="w-4 h-4" />
-            افزودن کلاینت
+            {t('addClient', language)}
           </button>
         </div>
       </div>

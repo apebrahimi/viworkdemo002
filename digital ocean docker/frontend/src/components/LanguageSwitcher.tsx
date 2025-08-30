@@ -14,7 +14,7 @@ export function LanguageSwitcher() {
   return (
     <button
       onClick={toggleLanguage}
-      className={`flex ${isRTL ? 'flex-row-reverse' : 'flex-row'} items-center ${isRTL ? 'space-x-reverse space-x-2' : 'space-x-2'} px-3 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors`}
+      className={`flex ${isRTL ? 'flex-row-reverse' : 'flex-row'} items-center ${isRTL ? 'space-x-reverse space-x-2' : 'space-x-2'} px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-white/10 dark:hover:bg-white/10 light:hover:bg-black/10 rounded-md transition-colors`}
       title={language === 'fa' ? 'Switch to English' : 'تغییر به فارسی'}
     >
       <Globe className="h-4 w-4" />

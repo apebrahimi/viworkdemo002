@@ -22,6 +22,8 @@ import {
   Server
 } from 'lucide-react';
 import { StatsCard } from '@/components/StatsCard';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { t } from '@/lib/translations';
 
 interface DemoStats {
   activeClients: number;
@@ -39,6 +41,7 @@ interface DemoStats {
 }
 
 export function DemoDashboardSection() {
+  const { language } = useLanguage();
   const [stats, setStats] = useState<DemoStats>({
     activeClients: 0,
     totalUsers: 0,
@@ -58,33 +61,33 @@ export function DemoDashboardSection() {
         const healthResponse = await fetch('/health');
         const healthData = await healthResponse.json();
         
-        // Generate demo activity
+        // Generate demo activity with Persian messages
         const demoActivity = [
           {
             id: '1',
             type: 'login' as const,
-            message: 'User "demo" logged in successfully',
+            message: language === 'fa' ? 'کاربر "demo" با موفقیت وارد شد' : 'User "demo" logged in successfully',
             timestamp: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
             status: 'success' as const
           },
           {
             id: '2',
             type: 'vpn_connect' as const,
-            message: 'VPN connection established from 192.168.1.100',
+            message: language === 'fa' ? 'اتصال VPN از آدرس 192.168.1.100 برقرار شد' : 'VPN connection established from 192.168.1.100',
             timestamp: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
             status: 'success' as const
           },
           {
             id: '3',
             type: 'container_spawned' as const,
-            message: 'Firefox container spawned for user demo_user',
+            message: language === 'fa' ? 'کانتینر Firefox برای کاربر demo_user ایجاد شد' : 'Firefox container spawned for user demo_user',
             timestamp: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
             status: 'success' as const
           },
           {
             id: '4',
             type: 'security_alert' as const,
-            message: 'Suspicious login attempt from unknown IP',
+            message: language === 'fa' ? 'تلاش مشکوک ورود از IP ناشناس' : 'Suspicious login attempt from unknown IP',
             timestamp: new Date(Date.now() - 20 * 60 * 1000).toISOString(),
             status: 'warning' as const
           }
@@ -118,11 +121,11 @@ export function DemoDashboardSection() {
     // Update data every 30 seconds
     const interval = setInterval(fetchDemoData, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [language]);
 
   const statsCards = [
     {
-      title: 'Active Clients',
+      title: t('activeClients', language),
       value: stats.activeClients.toString(),
       icon: Wifi,
       change: '+2',
@@ -131,25 +134,25 @@ export function DemoDashboardSection() {
       trend: 'up' as const
     },
     {
-      title: 'VPN Servers',
+      title: t('vpnServers', language),
       value: stats.vpnServers.toString(),
       icon: Server,
-      change: 'Online',
+      change: language === 'fa' ? 'آنلاین' : 'Online',
       changeType: 'positive' as const,
       gradient: 'primary' as const,
       trend: 'up' as const
     },
     {
-      title: 'Security Alerts',
+      title: t('securityAlerts', language),
       value: stats.securityAlerts.toString(),
       icon: AlertTriangle,
-      change: '1 Active',
+      change: language === 'fa' ? '1 فعال' : '1 Active',
       changeType: stats.securityAlerts > 0 ? 'negative' as const : 'positive' as const,
       gradient: 'warning' as const,
       trend: stats.securityAlerts > 0 ? 'up' as const : 'down' as const
     },
     {
-      title: 'Total Users',
+      title: t('totalUsers', language),
       value: stats.totalUsers.toString(),
       icon: Users,
       change: '+3',
@@ -183,7 +186,9 @@ export function DemoDashboardSection() {
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading demo dashboard...</p>
+          <p className="text-muted-foreground">
+            {language === 'fa' ? 'در حال بارگذاری داشبورد...' : 'Loading demo dashboard...'}
+          </p>
         </div>
       </div>
     );
@@ -200,14 +205,22 @@ export function DemoDashboardSection() {
               <Zap className="w-8 h-8 text-white" />
             </div>
             <div>
-              <h1 className="text-3xl font-bold gradient-text">ViWorkS Demo Dashboard</h1>
-              <p className="text-muted-foreground">Real-time monitoring and management interface</p>
+              <h1 className="text-3xl font-bold gradient-text">
+                {language === 'fa' ? 'داشبورد ViWorkS' : 'ViWorkS Demo Dashboard'}
+              </h1>
+              <p className="text-muted-foreground">
+                {language === 'fa' ? 'رابط نظارت و مدیریت در زمان واقعی' : 'Real-time monitoring and management interface'}
+              </p>
             </div>
           </div>
           <p className="text-lg text-muted-foreground max-w-2xl">
             {stats.systemHealth === 'healthy' 
-              ? '✅ System is running perfectly! All services are operational and security is at maximum level.'
-              : '⚠️ System needs attention. Please check service status.'
+              ? (language === 'fa' 
+                  ? '✅ سیستم به طور کامل در حال اجرا است! تمام سرویس‌ها فعال و امنیت در بالاترین سطح است.'
+                  : '✅ System is running perfectly! All services are operational and security is at maximum level.')
+              : (language === 'fa'
+                  ? '⚠️ سیستم نیاز به توجه دارد. لطفاً وضعیت سرویس‌ها را بررسی کنید.'
+                  : '⚠️ System needs attention. Please check service status.')
             }
           </p>
         </div>
@@ -233,8 +246,12 @@ export function DemoDashboardSection() {
                   <TrendingUp className="w-5 h-5 text-green-400" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-foreground">System Status</h3>
-                  <p className="text-sm text-muted-foreground">Current operational status</p>
+                  <h3 className="text-lg font-semibold text-foreground">
+                    {language === 'fa' ? 'وضعیت سیستم' : 'System Status'}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {language === 'fa' ? 'وضعیت عملیاتی فعلی' : 'Current operational status'}
+                  </p>
                 </div>
               </div>
             </div>
@@ -254,7 +271,9 @@ export function DemoDashboardSection() {
               <div className="p-4 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-all duration-200">
                 <div className="flex items-center space-x-3 mb-3">
                   <HardDrive className="w-5 h-5 text-green-400" />
-                  <span className="text-sm font-medium text-muted-foreground">Memory</span>
+                  <span className="text-sm font-medium text-muted-foreground">
+                    {language === 'fa' ? 'حافظه' : 'Memory'}
+                  </span>
                 </div>
                 <div className="text-2xl font-bold text-foreground mb-2">67%</div>
                 <div className="w-full bg-white/10 rounded-full h-2">
@@ -265,7 +284,9 @@ export function DemoDashboardSection() {
               <div className="p-4 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-all duration-200">
                 <div className="flex items-center space-x-3 mb-3">
                   <Network className="w-5 h-5 text-purple-400" />
-                  <span className="text-sm font-medium text-muted-foreground">Network</span>
+                  <span className="text-sm font-medium text-muted-foreground">
+                    {language === 'fa' ? 'شبکه' : 'Network'}
+                  </span>
                 </div>
                 <div className="text-2xl font-bold text-foreground mb-2">23%</div>
                 <div className="w-full bg-white/10 rounded-full h-2">
@@ -276,7 +297,9 @@ export function DemoDashboardSection() {
               <div className="p-4 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-all duration-200">
                 <div className="flex items-center space-x-3 mb-3">
                   <Server className="w-5 h-5 text-orange-400" />
-                  <span className="text-sm font-medium text-muted-foreground">Storage</span>
+                  <span className="text-sm font-medium text-muted-foreground">
+                    {language === 'fa' ? 'ذخیره‌سازی' : 'Storage'}
+                  </span>
                 </div>
                 <div className="text-2xl font-bold text-foreground mb-2">34%</div>
                 <div className="w-full bg-white/10 rounded-full h-2">
@@ -296,8 +319,12 @@ export function DemoDashboardSection() {
                   <Activity className="w-5 h-5 text-blue-400" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-foreground">Recent Activity</h3>
-                  <p className="text-sm text-muted-foreground">Latest system events</p>
+                  <h3 className="text-lg font-semibold text-foreground">
+                    {t('recentActivity', language)}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {language === 'fa' ? 'آخرین رویدادهای سیستم' : 'Latest system events'}
+                  </p>
                 </div>
               </div>
             </div>
@@ -329,8 +356,12 @@ export function DemoDashboardSection() {
               <Zap className="w-5 h-5 text-blue-400" />
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-foreground">Demo Actions</h3>
-              <p className="text-sm text-muted-foreground">Test the system functionality</p>
+              <h3 className="text-lg font-semibold text-foreground">
+                {language === 'fa' ? 'عملیات آزمایشی' : 'Demo Actions'}
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                {language === 'fa' ? 'تست عملکرد سیستم' : 'Test the system functionality'}
+              </p>
             </div>
           </div>
         </div>
@@ -357,8 +388,12 @@ export function DemoDashboardSection() {
                 <Shield className="w-5 h-5 text-blue-400" />
               </div>
               <div>
-                <p className="font-medium text-foreground">Test Login</p>
-                <p className="text-sm text-muted-foreground">Verify authentication</p>
+                <p className="font-medium text-foreground">
+                  {language === 'fa' ? 'تست ورود' : 'Test Login'}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {language === 'fa' ? 'تأیید احراز هویت' : 'Verify authentication'}
+                </p>
               </div>
             </div>
           </button>
@@ -384,8 +419,12 @@ export function DemoDashboardSection() {
                 <Monitor className="w-5 h-5 text-green-400" />
               </div>
               <div>
-                <p className="font-medium text-foreground">Spawn Container</p>
-                <p className="text-sm text-muted-foreground">Test container creation</p>
+                <p className="font-medium text-foreground">
+                  {language === 'fa' ? 'ایجاد کانتینر' : 'Spawn Container'}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {language === 'fa' ? 'تست ایجاد کانتینر' : 'Test container creation'}
+                </p>
               </div>
             </div>
           </button>
@@ -407,8 +446,12 @@ export function DemoDashboardSection() {
                 <Activity className="w-5 h-5 text-purple-400" />
               </div>
               <div>
-                <p className="font-medium text-foreground">Health Check</p>
-                <p className="text-sm text-muted-foreground">Verify system status</p>
+                <p className="font-medium text-foreground">
+                  {language === 'fa' ? 'بررسی سلامت' : 'Health Check'}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {language === 'fa' ? 'تأیید وضعیت سیستم' : 'Verify system status'}
+                </p>
               </div>
             </div>
           </button>

@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { useApi } from '@/hooks/useApiWrapper';
 import { apiServices } from '@/lib/api-services';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { t } from '@/lib/translations';
 
 interface Device {
   id: string;
@@ -28,6 +30,7 @@ export const DeviceManagementSection: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { apiCall } = useApi();
+  const { language } = useLanguage();
 
   const fetchDevices = async () => {
     try {
@@ -83,9 +86,9 @@ export const DeviceManagementSection: React.FC = () => {
 
   const getStatusBadge = (isActive: boolean) => {
     return isActive ? (
-      <Badge variant="success">Active</Badge>
+      <Badge variant="success" className="bg-green-100 text-green-800 border-green-200 dark:bg-green-900 dark:text-green-300 dark:border-green-700">فعال</Badge>
     ) : (
-      <Badge variant="destructive">Inactive</Badge>
+      <Badge variant="destructive" className="bg-red-100 text-red-800 border-red-200 dark:bg-red-900 dark:text-red-300 dark:border-red-700">غیرفعال</Badge>
     );
   };
 
@@ -101,14 +104,14 @@ export const DeviceManagementSection: React.FC = () => {
 
   if (loading) {
     return (
-      <Card>
+      <Card className="bg-card border-border">
         <CardHeader>
-          <CardTitle>Device Management</CardTitle>
+          <CardTitle className="text-foreground">{t('deviceManagement', language)}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <span className="ml-2">Loading devices...</span>
+            <span className="ml-2 text-muted-foreground">Loading devices...</span>
           </div>
         </CardContent>
       </Card>
@@ -116,41 +119,41 @@ export const DeviceManagementSection: React.FC = () => {
   }
 
   return (
-    <Card>
+    <Card className="bg-card border-border">
       <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle>Device Management</CardTitle>
+          <CardTitle className="text-foreground">{t('deviceManagement', language)}</CardTitle>
           <Button onClick={fetchDevices} variant="outline" size="sm">
-            🔄 Refresh
+            🔄 {t('refresh', language)}
           </Button>
         </div>
       </CardHeader>
       <CardContent>
         {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
-            <p className="text-red-600">{error}</p>
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md dark:bg-red-900/20 dark:border-red-800">
+            <p className="text-red-600 dark:text-red-400">{error}</p>
           </div>
         )}
 
         {devices.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
-            <p>No devices registered yet.</p>
-            <p className="text-sm">Devices will appear here when users register them.</p>
+          <div className="text-center py-8 text-muted-foreground">
+            <p>{t('noDevicesRegistered', language)}</p>
+            <p className="text-sm">{t('devicesWillAppear', language)}</p>
           </div>
         ) : (
           <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {devices.map((device) => (
-                <Card key={device.id} className="hover:shadow-md transition-shadow">
+                <Card key={device.id} className="hover:shadow-md transition-shadow bg-card border-border">
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex items-center space-x-2">
                         <span className="text-2xl">{getOSIcon(device.os)}</span>
                         <div>
-                          <h3 className="font-semibold text-sm">
+                          <h3 className="font-semibold text-sm text-foreground">
                             {device.device_name || device.model}
                           </h3>
-                          <p className="text-xs text-gray-500">{device.manufacturer}</p>
+                          <p className="text-xs text-muted-foreground">{device.manufacturer}</p>
                         </div>
                       </div>
                       {getStatusBadge(device.is_active)}
@@ -158,25 +161,25 @@ export const DeviceManagementSection: React.FC = () => {
 
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
-                        <span className="text-gray-600">Device ID:</span>
-                        <span className="font-mono text-xs">{device.device_id}</span>
+                        <span className="text-muted-foreground">{t('deviceId', language)}:</span>
+                        <span className="font-mono text-xs text-foreground">{device.device_id}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-600">OS:</span>
-                        <span>{device.os}</span>
+                        <span className="text-muted-foreground">{t('os', language)}:</span>
+                        <span className="text-foreground">{device.os}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-600">App Version:</span>
-                        <span>{device.app_version}</span>
+                        <span className="text-muted-foreground">{t('appVersion', language)}:</span>
+                        <span className="text-foreground">{device.app_version}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-600">Created:</span>
-                        <span className="text-xs">{formatDate(device.created_at)}</span>
+                        <span className="text-muted-foreground">{t('created', language)}:</span>
+                        <span className="text-xs text-foreground">{formatDate(device.created_at)}</span>
                       </div>
                       {device.last_used_at && (
                         <div className="flex justify-between">
-                          <span className="text-gray-600">Last Used:</span>
-                          <span className="text-xs">{formatDate(device.last_used_at)}</span>
+                          <span className="text-muted-foreground">{t('lastUsed', language)}:</span>
+                          <span className="text-xs text-foreground">{formatDate(device.last_used_at)}</span>
                         </div>
                       )}
                     </div>
@@ -189,7 +192,7 @@ export const DeviceManagementSection: React.FC = () => {
                           size="sm"
                           className="flex-1"
                         >
-                          Deactivate
+                          {t('deactivate', language)}
                         </Button>
                       ) : (
                         <Button
@@ -198,7 +201,7 @@ export const DeviceManagementSection: React.FC = () => {
                           size="sm"
                           className="flex-1"
                         >
-                          Activate
+                          {t('activate', language)}
                         </Button>
                       )}
                       <Button
@@ -210,7 +213,7 @@ export const DeviceManagementSection: React.FC = () => {
                           console.log('View device details:', device);
                         }}
                       >
-                        Details
+                        {t('details', language)}
                       </Button>
                     </div>
                   </CardContent>
@@ -218,28 +221,28 @@ export const DeviceManagementSection: React.FC = () => {
               ))}
             </div>
 
-            <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-              <h4 className="font-semibold mb-2">📊 Device Statistics</h4>
+            <div className="mt-6 p-4 bg-muted rounded-lg">
+              <h4 className="font-semibold mb-2 text-foreground">📊 {t('deviceStatistics', language)}</h4>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                 <div>
-                  <p className="text-gray-600">Total Devices</p>
-                  <p className="font-semibold text-lg">{devices.length}</p>
+                  <p className="text-muted-foreground">{t('totalDevices', language)}</p>
+                  <p className="font-semibold text-lg text-foreground">{devices.length}</p>
                 </div>
                 <div>
-                  <p className="text-gray-600">Active Devices</p>
-                  <p className="font-semibold text-lg text-green-600">
+                  <p className="text-muted-foreground">{t('activeDevices', language)}</p>
+                  <p className="font-semibold text-lg text-green-600 dark:text-green-400">
                     {devices.filter(d => d.is_active).length}
                   </p>
                 </div>
                 <div>
-                  <p className="text-gray-600">Inactive Devices</p>
-                  <p className="font-semibold text-lg text-red-600">
+                  <p className="text-muted-foreground">{t('inactiveDevices', language)}</p>
+                  <p className="font-semibold text-lg text-red-600 dark:text-red-400">
                     {devices.filter(d => !d.is_active).length}
                   </p>
                 </div>
                 <div>
-                  <p className="text-gray-600">Platforms</p>
-                  <p className="font-semibold text-lg">
+                  <p className="text-muted-foreground">{t('platforms', language)}</p>
+                  <p className="font-semibold text-lg text-foreground">
                     {new Set(devices.map(d => d.os)).size}
                   </p>
                 </div>
