@@ -190,10 +190,10 @@ async fn login(req: web::Json<LoginRequest>) -> HttpResponse {
         
         HttpResponse::Ok().json(LoginResponse {
             success: true,
-            message: "Login successful, 2FA required".to_string(),
+            message: "Login successful".to_string(),
             data: Some(LoginData {
             session_id,
-                requires_2fa: true,
+                requires_2fa: false,
             }),
         })
     } else {
