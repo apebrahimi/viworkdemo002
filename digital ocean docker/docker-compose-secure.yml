@@ -1,0 +1,138 @@
+services:
+  # PostgreSQL Database (Internal Network Only)
+  postgres:
+    image: postgres:15-alpine
+    container_name: viworks-postgres
+    environment:
+      POSTGRES_DB: viworks_admin
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-viworks_password_2024}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    # NO PORTS EXPOSED - Internal network only
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - viworks-internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d viworks_admin"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Redis Cache (Internal Network Only)
+  redis:
+    image: redis:7-alpine
+    container_name: viworks-redis
+    # NO PORTS EXPOSED - Internal network only
+    volumes:
+      - redis_data:/data
+    networks:
+      - viworks-internal
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Backend API Server (Rust) - Connected to both networks
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: viworks-backend
+    # NO PORTS EXPOSED - Access through nginx only
+    env_file:
+      - ./env.production
+    volumes:
+      - ./backend/logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - viworks-internal  # For database access
+      - viworks-external  # For nginx access
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Frontend Next.js App (External Network Only)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: viworks-frontend
+    # NO PORTS EXPOSED - Access through nginx only
+    env_file:
+      - ./env.production
+    depends_on:
+      - backend
+    networks:
+      - viworks-external
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Website Container (External Network Only)
+  website:
+    build:
+      context: ./website
+      dockerfile: Dockerfile
+    container_name: viworks-website
+    # NO PORTS EXPOSED - Access through nginx only
+    env_file:
+      - ./env.production
+    networks:
+      - viworks-external
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Standalone Nginx Reverse Proxy (External Network Only)
+  nginx:
+    image: nginx:alpine
+    container_name: viworks-standalone-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/letsencrypt:ro
+      - ./nginx/logs:/var/log/nginx
+    networks:
+      - viworks-external
+    depends_on:
+      - frontend
+      - backend
+      - website
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  viworks-internal:
+    driver: bridge
+    internal: true  # Internal network - no external access
+  viworks-external:
+    driver: bridge

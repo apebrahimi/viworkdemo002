@@ -9,7 +9,8 @@ RUN apk add --no-cache \
     openssl-dev \
     postgresql-dev \
     musl-dev \
-    gcc
+    gcc \
+    curl
 
 # Add MUSL target for Alpine compatibility
 RUN rustup target add x86_64-unknown-linux-musl
@@ -39,17 +40,49 @@ RUN cargo clean && cargo build --release
 
 # Runtime stage (Alpine)
 FROM alpine:3.22
-RUN apk add --no-cache ca-certificates dumb-init busybox-extras netcat-openbsd wget curl tzdata
+
+# Install runtime dependencies
+RUN apk add --no-cache \
+    ca-certificates \
+    dumb-init \
+    busybox-extras \
+    netcat-openbsd \
+    wget \
+    curl \
+    tzdata \
+    postgresql-client \
+    redis
+
 WORKDIR /app
 
-# Copy binary & entrypoint (adjust binary name if different)
+# Copy binary & entrypoint
 COPY --from=builder /app/target/release/viworks-admin-backend /app/app
 COPY --from=builder /app/migrations /app/migrations
 COPY ops/entrypoint.sh /app/entrypoint.sh
-RUN adduser -D -u 10001 appuser && chown -R appuser:appuser /app && chmod +x /app/entrypoint.sh
 
-ENV RUST_LOG=info RUST_BACKTRACE=1 SSL_CERT_DIR=/etc/ssl/certs HOST=0.0.0.0 PORT=8081
+# Create non-root user
+RUN adduser -D -u 10001 appuser && \
+    chown -R appuser:appuser /app && \
+    chmod +x /app/entrypoint.sh
+
+# Set environment variables
+ENV RUST_LOG=info \
+    RUST_BACKTRACE=1 \
+    SSL_CERT_DIR=/etc/ssl/certs \
+    HOST=0.0.0.0 \
+    PORT=8081 \
+    TZ=UTC
+
+# Switch to non-root user
 USER appuser
+
+# Expose port
 EXPOSE 8081
-ENTRYPOINT ["/usr/bin/dumb-init","--"]
-CMD ["/app/entrypoint.sh","/app/app"]
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:8081/health || exit 1
+
+# Use dumb-init for proper signal handling
+ENTRYPOINT ["/usr/bin/dumb-init", "--"]
+CMD ["/app/entrypoint.sh", "/app/app"]

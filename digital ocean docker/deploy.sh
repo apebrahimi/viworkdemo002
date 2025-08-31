@@ -9,17 +9,25 @@ if [ ! -f "docker-compose.yml" ]; then
     exit 1
 fi
 
-# Stop existing containers
-echo "🛑 Stopping existing containers..."
-docker-compose down || true
+# Stop and remove existing containers with force
+echo "🛑 Stopping and removing existing containers..."
+docker-compose down --remove-orphans || true
+
+# Force remove any lingering containers with our names
+echo "🧹 Force removing any lingering containers..."
+docker rm -f viworks-backend viworks-frontend viworks-postgres viworks-redis 2>/dev/null || true
 
 # Remove old images to free space
 echo "🧹 Cleaning up old images..."
 docker image prune -f
 
+# Remove any dangling images
+echo "🧹 Removing dangling images..."
+docker image prune -a -f
+
 # Build and start new containers
 echo "🔨 Building and starting new containers..."
-docker-compose up -d --build
+docker-compose up -d --build --force-recreate
 
 # Wait for services to be ready
 echo "⏳ Waiting for services to be ready..."
