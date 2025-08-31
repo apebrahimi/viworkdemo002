@@ -41,7 +41,6 @@ import {
 } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
-
 interface VpnServer {
   id: string;
   name: string;

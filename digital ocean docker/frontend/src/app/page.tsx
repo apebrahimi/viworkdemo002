@@ -4,12 +4,14 @@ import { useState } from 'react';
 import { DemoDashboardSection } from '@/components/sections/DemoDashboardSection';
 import { UsersSection } from '@/components/sections/UsersSection';
 import { ClientsSection } from '@/components/sections/ClientsSection';
+import { MobileApplicationsSection } from '@/components/sections/MobileApplicationsSection';
 import { MonitoringSection } from '@/components/sections/MonitoringSection';
 import { SecuritySection } from '@/components/sections/SecuritySection';
 import { ServersSection } from '@/components/sections/ServersSection';
 import { DatabaseSection } from '@/components/sections/DatabaseSection';
 import { LogsSection } from '@/components/sections/LogsSection';
 import { DeviceManagementSection } from '@/components/sections/DeviceManagementSection';
+import { SettingsSection } from '@/components/sections/SettingsSection';
 import { Sidebar } from '@/components/Sidebar';
 import { Header } from '@/components/Header';
 import { ClientOnly } from '@/components/ClientOnly';
@@ -24,7 +26,8 @@ type Section =
   | 'servers' 
   | 'database' 
   | 'logs'
-  | 'devices';
+  | 'devices'
+  | 'settings';
 
 export default function AdminPanel() {
   const [activeSection, setActiveSection] = useState<Section>('dashboard');
@@ -61,7 +64,9 @@ export default function AdminPanel() {
       case 'logs':
         return <LogsSection />;
       case 'devices':
-        return <DeviceManagementSection />;
+        return <MobileApplicationsSection />;
+      case 'settings':
+        return <SettingsSection />;
       default:
         return <DemoDashboardSection />;
     }

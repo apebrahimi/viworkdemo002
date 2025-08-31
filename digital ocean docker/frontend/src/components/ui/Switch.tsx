@@ -1,4 +1,5 @@
 import React from 'react';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface SwitchProps {
   checked: boolean;
@@ -8,6 +9,9 @@ interface SwitchProps {
 }
 
 export function Switch({ checked, onChange, disabled = false, className = '' }: SwitchProps) {
+  const { language } = useLanguage();
+  const isRTL = language === 'fa';
+
   return (
     <button
       type="button"
@@ -25,7 +29,10 @@ export function Switch({ checked, onChange, disabled = false, className = '' }: 
       <span
         className={`
           inline-block h-4 w-4 transform rounded-full bg-white transition-transform
-          ${checked ? 'translate-x-6' : 'translate-x-1'}
+          ${checked 
+            ? (isRTL ? '-translate-x-6' : 'translate-x-6') 
+            : (isRTL ? '-translate-x-1' : 'translate-x-1')
+          }
         `}
       />
     </button>

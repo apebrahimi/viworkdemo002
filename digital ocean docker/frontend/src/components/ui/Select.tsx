@@ -12,6 +12,8 @@ interface SelectProps {
   placeholder?: string;
   disabled?: boolean;
   className?: string;
+  id?: string;
+  label?: string;
 }
 
 export const Select: React.FC<SelectProps> = ({
@@ -21,14 +23,23 @@ export const Select: React.FC<SelectProps> = ({
   placeholder = 'Select an option',
   disabled = false,
   className = '',
+  id,
+  label,
 }) => {
   return (
-    <select
-      value={value}
-      onChange={(e) => onChange?.(e.target.value)}
-      disabled={disabled}
-      className={`block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${className}`}
-    >
+    <div className="w-full">
+      {label && (
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          {label}
+        </label>
+      )}
+      <select
+        id={id}
+        value={value}
+        onChange={(e) => onChange?.(e.target.value)}
+        disabled={disabled}
+        className={`block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${className}`}
+      >
       <option value="" disabled>
         {placeholder}
       </option>
@@ -37,6 +48,7 @@ export const Select: React.FC<SelectProps> = ({
           {option.label}
         </option>
       ))}
-    </select>
+      </select>
+    </div>
   );
 };

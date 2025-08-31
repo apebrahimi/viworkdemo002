@@ -184,12 +184,12 @@ export function TicketList({ tickets, showPagination = true }: TicketListProps) 
                   </span>
                 </td>
                 <td className="py-4 px-6">
-                  <Badge variant={getSeverityColor(ticket.severity) as any}>
+                  <Badge variant={getSeverityColor(ticket.severity) as "default" | "secondary" | "destructive" | "outline"}>
                     {getSeverityLabel(ticket.severity)}
                   </Badge>
                 </td>
                 <td className="py-4 px-6">
-                  <Badge variant={getStatusColor(ticket.status) as any}>
+                  <Badge variant={getStatusColor(ticket.status) as "default" | "secondary" | "destructive" | "outline"}>
                     {getStatusLabel(ticket.status)}
                   </Badge>
                 </td>

@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  viworks-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile.alpine
+    container_name: viworks-agent-test
+    hostname: viworks-gateway
+    ports:
+      - "8443:8443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+    environment:
+      - RUST_LOG=info
+      - AGENT_CONFIG=/etc/viworks/agent.toml
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8443/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - viworks-network
+
+networks:
+  viworks-network:
+    driver: bridge

@@ -376,9 +376,11 @@ export function DemoDashboardSection() {
                   body: JSON.stringify({ username: 'demo', password: 'demo' })
                 });
                 const data = await response.json();
-                alert(`Login test: ${data.success ? 'SUCCESS' : 'FAILED'}\nMessage: ${data.message}`);
+                // eslint-disable-next-line no-console
+                console.log(`Login test: ${data.success ? 'SUCCESS' : 'FAILED'}\nMessage: ${data.message}`);
               } catch (error) {
-                alert('Login test failed: ' + error);
+                // eslint-disable-next-line no-console
+                console.log(`Login test failed: ${error}`);
               }
             }}
             className="group p-4 rounded-lg bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20 hover:from-blue-500/20 hover:to-purple-500/20 transition-all duration-200"
@@ -407,9 +409,11 @@ export function DemoDashboardSection() {
                   body: JSON.stringify({ username: 'demo_user', session_id: 'demo_session' })
                 });
                 const data = await response.json();
-                alert(`Container spawn test: ${data.container_id ? 'SUCCESS' : 'FAILED'}\nContainer ID: ${data.container_id}`);
+                // eslint-disable-next-line no-console
+                console.log(`Container spawn test: ${data.container_id ? 'SUCCESS' : 'FAILED'}\nContainer ID: ${data.container_id}`);
               } catch (error) {
-                alert('Container spawn test failed: ' + error);
+                // eslint-disable-next-line no-console
+                console.log(`Container spawn test failed: ${error}`);
               }
             }}
             className="group p-4 rounded-lg bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20 hover:from-green-500/20 hover:to-emerald-500/20 transition-all duration-200"
@@ -434,9 +438,11 @@ export function DemoDashboardSection() {
               try {
                 const response = await fetch('/health');
                 const data = await response.json();
-                alert(`Health check: ${data.status}\nMessage: ${data.message}`);
+                // eslint-disable-next-line no-console
+                console.log(`Health check: ${data.status}\nMessage: ${data.message}`);
               } catch (error) {
-                alert('Health check failed: ' + error);
+                // eslint-disable-next-line no-console
+                console.log(`Health check failed: ${error}`);
               }
             }}
             className="group p-4 rounded-lg bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/20 hover:from-purple-500/20 hover:to-pink-500/20 transition-all duration-200"

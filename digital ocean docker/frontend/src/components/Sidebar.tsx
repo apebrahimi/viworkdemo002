@@ -46,6 +46,7 @@ export function Sidebar({ isOpen, onToggle, activeTab, onTabChange }: SidebarPro
     { id: 'servers', name: t('servers', language), icon: Globe, badge: '8' },
     { id: 'database', name: t('database', language), icon: Database, badge: null },
     { id: 'logs', name: t('logs', language), icon: Terminal, badge: null },
+    { id: 'settings', name: t('settings', language), icon: Settings, badge: null },
   ];
 
   const toggleExpanded = () => {
@@ -60,10 +61,7 @@ export function Sidebar({ isOpen, onToggle, activeTab, onTabChange }: SidebarPro
   };
 
   const handleSettingsClick = () => {
-    // TODO: Navigate to settings page or open settings modal
-    console.log('Settings clicked');
-    // For now, just show an alert
-    alert(language === 'fa' ? 'تنظیمات: این بخش در حال توسعه است' : 'Settings: This section is under development');
+    onTabChange('settings');
   };
 
   return (

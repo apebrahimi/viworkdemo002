@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { useApi } from '@/hooks/useApiWrapper';
-import { apiServices } from '@/lib/api-services';
+import { api } from '@/lib/api';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { t } from '@/lib/translations';
 
@@ -38,7 +38,7 @@ export const DeviceManagementSection: React.FC = () => {
       setError(null);
       
       const response = await apiCall<DeviceListResponse>(() => 
-        apiServices.get('/api/v1/auth/devices')
+        api.get('/api/v1/auth/devices')
       );
       
       if (response.success) {
@@ -61,7 +61,7 @@ export const DeviceManagementSection: React.FC = () => {
   const handleDeactivateDevice = async (deviceId: string) => {
     try {
       await apiCall(() => 
-        apiServices.post(`/api/v1/auth/devices/${deviceId}/deactivate`)
+        api.post(`/api/v1/auth/devices/${deviceId}/deactivate`)
       );
       fetchDevices(); // Refresh the list
     } catch (err) {
@@ -72,7 +72,7 @@ export const DeviceManagementSection: React.FC = () => {
   const handleActivateDevice = async (deviceId: string) => {
     try {
       await apiCall(() => 
-        apiServices.post(`/api/v1/auth/devices/${deviceId}/activate`)
+        api.post(`/api/v1/auth/devices/${deviceId}/activate`)
       );
       fetchDevices(); // Refresh the list
     } catch (err) {

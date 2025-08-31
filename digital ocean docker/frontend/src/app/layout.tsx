@@ -5,6 +5,7 @@ import { LanguageProvider } from '@/contexts/LanguageContext'
 import { ThemeProvider } from '@/contexts/ThemeContext'
 import { RealtimeProvider } from '@/contexts/RealtimeContext'
 import { QueryProvider } from '@/lib/query-client'
+import { Toaster } from 'react-hot-toast'
 
 export const metadata: Metadata = {
   title: 'ViWorkS Admin Panel - پنل مدیریت',
@@ -66,6 +67,7 @@ export default function RootLayout({
                   <div className="h-screen bg-background text-foreground overflow-hidden">
                     {children}
                   </div>
+                  <Toaster />
                 </RealtimeProvider>
               </AuthProvider>
             </ThemeProvider>

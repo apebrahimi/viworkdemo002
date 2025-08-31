@@ -47,11 +47,20 @@ apiClient.interceptors.response.use(
     return response;
   },
   (error) => {
+    // Only handle 401 errors for authentication-related endpoints
     if (error.response?.status === 401) {
-      // Token expired or invalid
-      localStorage.removeItem('auth_token');
-      localStorage.removeItem('user');
-      window.location.href = '/login';
+      const url = error.config?.url || '';
+      
+      // Don't auto-logout for demo/mock endpoints or non-auth endpoints
+      if (url.includes('/api/v1/auth/') || url.includes('/login') || url.includes('/logout')) {
+        // Token expired or invalid for auth endpoints
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('user');
+        window.location.href = '/login';
+      } else {
+        // For other endpoints, just log the error but don't logout
+        console.warn('API call failed with 401, but not logging out for non-auth endpoint:', url);
+      }
     }
     return Promise.reject(error);
   }

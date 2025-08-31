@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  viworks-website:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: viworks-website
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_TELEMETRY_DISABLED=1
+    networks:
+      - viworks-network
+
+networks:
+  viworks-network:
+    driver: bridge

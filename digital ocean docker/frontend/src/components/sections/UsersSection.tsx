@@ -1,350 +1,359 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { useUsers, useCreateUser, useUpdateUser, useDeleteUser } from '@/hooks/useApi';
-import { User, CreateUserRequest, UpdateUserRequest } from '@/lib/types';
-import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
-import { Badge } from '@/components/ui/Badge';
-import { Modal } from '@/components/ui/Modal';
-import { Input } from '@/components/ui/Input';
-import { apiServices } from '@/lib/api-services';
+import { useState, useMemo } from 'react';
+import { 
+  Users, 
+  Shield, 
+  Clock, 
+  AlertCircle,
+  CheckCircle,
+  Filter,
+  Plus,
+  X
+} from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { t } from '@/lib/translations';
+import { usersApi } from '@/lib/api-services';
+import { toast } from 'react-hot-toast';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { SearchBar } from '@/components/ui/SearchBar';
+import { FilterDropdown } from '@/components/ui/FilterDropdown';
+import { UsersTable } from '@/components/ui/DataTableNew';
+import { AddUserModal } from '@/components/ui/AddUserModal';
+import { formatDate, type SortField, type SortDirection, type SortConfig } from '@/lib/utils';
 
-interface DeviceRequest {
+interface User {
+  id: string;
   username: string;
-  fingerprint: string;
-  status: string;
-  created_at: string;
+  email: string;
+  role: 'admin' | 'user' | 'moderator';
+  status: 'active' | 'inactive' | 'pending' | 'suspended';
+  lastLogin: string;
+  createdAt: string;
+  deviceCount: number;
 }
 
-const UsersSection = () => {
-  const [users, setUsers] = useState<User[]>([]);
-  const [deviceRequests, setDeviceRequests] = useState<DeviceRequest[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showDeviceModal, setShowDeviceModal] = useState(false);
-  const [newUser, setNewUser] = useState({
-    username: '',
-    email: '',
-    mobile: '',
-    policy_window: 'Mon-Fri 09:00-17:00',
-    device_binding: true,
+
+
+export function UsersSection() {
+  const { language, isRTL } = useLanguage();
+  
+  // Mock data - replace with actual API calls
+  const [users] = useState<User[]>([
+    {
+      id: '1',
+      username: 'admin',
+      email: 'admin@viworks.com',
+      role: 'admin',
+      status: 'active',
+      lastLogin: '2024-01-15T10:30:00Z',
+      createdAt: '2024-01-01T00:00:00Z',
+      deviceCount: 3
+    },
+    {
+      id: '2',
+      username: 'user1',
+      email: 'user1@example.com',
+      role: 'user',
+      status: 'active',
+      lastLogin: '2024-01-14T15:45:00Z',
+      createdAt: '2024-01-05T00:00:00Z',
+      deviceCount: 1
+    },
+    {
+      id: '3',
+      username: 'moderator1',
+      email: 'mod@example.com',
+      role: 'moderator',
+      status: 'pending',
+      lastLogin: '2024-01-13T09:20:00Z',
+      createdAt: '2024-01-10T00:00:00Z',
+      deviceCount: 2
+    }
+  ]);
+
+  // State
+  const [searchTerm, setSearchTerm] = useState('');
+  const [roleFilter, setRoleFilter] = useState<string[]>(['admin', 'user', 'moderator']);
+  const [statusFilter, setStatusFilter] = useState<string[]>(['active', 'inactive', 'pending', 'suspended']);
+  const [sortConfig, setSortConfig] = useState<SortConfig>({
+    field: 'username',
+    direction: 'asc'
   });
-  const { language } = useLanguage();
+  const [showAddModal, setShowAddModal] = useState(false);
 
-  // Load users and device requests
-  const loadData = async () => {
-    try {
-      setLoading(true);
-      const [usersResponse, deviceRequestsResponse] = await Promise.all([
-        apiServices.users.getUsers(),
-        apiServices.users.getDeviceRequests(),
-      ]);
+  // Computed values
+  const roles = ['admin', 'user', 'moderator'];
+  const statuses = ['active', 'inactive', 'pending', 'suspended'];
+
+  // Default filter values
+  const defaultRoleFilter = ['admin', 'user', 'moderator'];
+  const defaultStatusFilter = ['active', 'inactive', 'pending', 'suspended'];
+
+  // Check if any filters are modified from default
+  const hasActiveFilters = searchTerm || 
+    roleFilter.length !== defaultRoleFilter.length || 
+    statusFilter.length !== defaultStatusFilter.length ||
+    !roleFilter.every(r => defaultRoleFilter.includes(r)) ||
+    !statusFilter.every(s => defaultStatusFilter.includes(s));
+
+  // Get active filter count (only count modified filters)
+  const activeFilterCount = [
+    searchTerm ? 1 : 0,
+    roleFilter.length !== defaultRoleFilter.length || !roleFilter.every(r => defaultRoleFilter.includes(r)) ? 1 : 0,
+    statusFilter.length !== defaultStatusFilter.length || !statusFilter.every(s => defaultStatusFilter.includes(s)) ? 1 : 0
+  ].reduce((a, b) => a + b, 0);
+
+  // Filter and sort users
+  const filteredAndSortedUsers = useMemo(() => {
+    let filtered = users.filter(user => {
+      const matchesSearch = !searchTerm || 
+        user.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user.email.toLowerCase().includes(searchTerm.toLowerCase());
       
-      setUsers(usersResponse.users || []);
-      setDeviceRequests(deviceRequestsResponse.requests || []);
-    } catch (error) {
-      console.error('Error loading data:', error);
-      // Don't throw error to prevent logout
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  // Create new user
-  const handleCreateUser = async () => {
-    try {
-      await apiServices.users.createUser({
-        username: newUser.username,
-        email: newUser.email,
-        mobile: newUser.mobile,
-        role: 'user',
-        status: 'pending',
-      });
+      const matchesRole = roleFilter.includes(user.role);
+      const matchesStatus = statusFilter.includes(user.status);
       
-      setShowCreateModal(false);
-      setNewUser({
-        username: '',
-        email: '',
-        mobile: '',
-        policy_window: 'Mon-Fri 09:00-17:00',
-        device_binding: true,
-      });
-      loadData();
-    } catch (error) {
-      console.error('Error creating user:', error);
-      // Don't throw error to prevent logout
-    }
+      return matchesSearch && matchesRole && matchesStatus;
+    });
+
+    // Sort
+    filtered.sort((a, b) => {
+      let aValue = a[sortConfig.field];
+      let bValue = b[sortConfig.field];
+      
+      // Handle role field for Persian sorting
+      if (sortConfig.field === 'role') {
+        const getRoleSortValue = (role: string) => {
+          switch (role) {
+            case 'admin': return language === 'fa' ? 'مدیر' : 'admin';
+            case 'moderator': return language === 'fa' ? 'ناظر' : 'moderator';
+            case 'user': return language === 'fa' ? 'کاربر' : 'user';
+            default: return role;
+          }
+        };
+        aValue = getRoleSortValue(aValue);
+        bValue = getRoleSortValue(bValue);
+      }
+      
+      // Convert to string and handle Persian text
+      const aStr = String(aValue).toLowerCase();
+      const bStr = String(bValue).toLowerCase();
+      
+      if (aStr < bStr) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (aStr > bStr) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return filtered;
+  }, [users, searchTerm, roleFilter, statusFilter, sortConfig]);
+
+  // Sort handler
+  const handleSort = (field: SortField) => {
+    setSortConfig(prev => ({
+      field,
+      direction: prev.field === field && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
   };
 
-  // Activate user
-  const handleActivateUser = async (username: string) => {
+  // Action handlers
+  const handleActivateUser = async (userId: string) => {
     try {
-      await apiServices.users.activateUser(username);
-      loadData();
+      await usersApi.activateUser(userId);
+      toast.success(language === 'fa' ? 'کاربر فعال شد' : 'User activated successfully');
     } catch (error) {
-      console.error('Error activating user:', error);
-      // Don't throw error to prevent logout
+      toast.error(language === 'fa' ? 'خطا در فعال‌سازی کاربر' : 'Failed to activate user');
     }
   };
 
-  // Approve device request
-  const handleApproveDevice = async (requestId: string) => {
+  const handleAddUser = async (formData: { username: string; email: string; role: string }) => {
     try {
-      await apiServices.users.approveDevice(requestId);
-      loadData();
+      // TODO: Implement user creation API call
+      console.log('Adding user:', formData);
+      toast.success(language === 'fa' ? 'کاربر با موفقیت اضافه شد' : 'User added successfully');
+      setShowAddModal(false);
     } catch (error) {
-      console.error('Error approving device:', error);
-      // Don't throw error to prevent logout
+      toast.error(language === 'fa' ? 'خطا در افزودن کاربر' : 'Failed to add user');
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'active':
-        return <Badge variant="success" className="bg-green-100 text-green-800 border-green-200">فعال</Badge>;
-      case 'pending':
-        return <Badge variant="warning" className="bg-yellow-100 text-yellow-800 border-yellow-200">در انتظار</Badge>;
-      case 'inactive':
-        return <Badge variant="destructive" className="bg-red-100 text-red-800 border-red-200">غیرفعال</Badge>;
-      default:
-        return <Badge variant="secondary" className="bg-gray-100 text-gray-800 border-gray-200">{status}</Badge>;
+  const handleEditUser = async (userId: string) => {
+    try {
+      // TODO: Implement user edit functionality
+      console.log('Editing user:', userId);
+      toast.success(language === 'fa' ? 'ویرایش کاربر' : 'Edit user');
+    } catch (error) {
+      toast.error(language === 'fa' ? 'خطا در ویرایش کاربر' : 'Failed to edit user');
     }
   };
 
-  const getDeviceStatusBadge = (status: string) => {
-    switch (status) {
-      case 'approved':
-        return <Badge variant="success" className="bg-green-100 text-green-800 border-green-200">تأیید شده</Badge>;
-      case 'pending':
-        return <Badge variant="warning" className="bg-yellow-100 text-yellow-800 border-yellow-200">در انتظار</Badge>;
-      case 'rejected':
-        return <Badge variant="destructive" className="bg-red-100 text-red-800 border-red-200">رد شده</Badge>;
-      default:
-        return <Badge variant="secondary" className="bg-gray-100 text-gray-800 border-gray-200">{status}</Badge>;
+  const handleViewDetails = async (userId: string) => {
+    try {
+      // TODO: Implement user details view
+      console.log('Viewing user details:', userId);
+      toast.success(language === 'fa' ? 'مشاهده جزئیات کاربر' : 'View user details');
+    } catch (error) {
+      toast.error(language === 'fa' ? 'خطا در مشاهده جزئیات' : 'Failed to view details');
     }
   };
 
-  if (loading) {
-    return (
-      <div className="space-y-6">
-        <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">{t('userManagement', language)}</h2>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-gray-500 dark:text-gray-400">{t('loadingUsers', language)}</div>
-        </div>
-      </div>
-    );
-  }
+  const handleDeleteUser = async (userId: string) => {
+    try {
+      // TODO: Implement user deletion API call
+      console.log('Deleting user:', userId);
+      toast.success(language === 'fa' ? 'کاربر با موفقیت حذف شد' : 'User deleted successfully');
+    } catch (error) {
+      toast.error(language === 'fa' ? 'خطا در حذف کاربر' : 'Failed to delete user');
+    }
+  };
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">{t('userManagement', language)}</h2>
-          <p className="text-gray-600 dark:text-gray-300 mt-1">
-            {t('userManagementDesc', language)}
-          </p>
+    <div className="flex flex-col h-screen" style={{ height: 'calc(100vh - 100px)', overflow: 'hidden' }}>
+      <PageHeader
+        title={t('usersManagement', language)}
+        description={t('usersManagementDesc', language)}
+        searchBar={
+          <SearchBar
+            value={searchTerm}
+            onChange={setSearchTerm}
+            placeholder={language === 'fa' ? 'جستجو در کاربران...' : 'Search users...'}
+          />
+        }
+        stats={
+          <>
+            <button
+              onClick={() => {
+                setStatusFilter(defaultStatusFilter);
+                setRoleFilter(defaultRoleFilter);
+              }}
+              className={`flex items-center gap-1.5 px-2 py-1 rounded-md border transition-colors ${
+                statusFilter.length === defaultStatusFilter.length && roleFilter.length === defaultRoleFilter.length
+                  ? 'bg-blue-100 dark:bg-blue-950/50 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300 font-semibold'
+                  : 'bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-950/50 hover:border-blue-300 dark:hover:border-blue-700'
+              }`}
+            >
+              <Users className="w-3 h-3" />
+              <span className="font-medium">{users.length}</span>
+              <span>{language === 'fa' ? 'کل' : 'Total Users'}</span>
+            </button>
+            
+            <button
+              onClick={() => {
+                if (statusFilter.length === 1 && statusFilter.includes('active')) {
+                  setStatusFilter(defaultStatusFilter);
+                } else {
+                  setStatusFilter(['active']);
+                }
+                setRoleFilter(defaultRoleFilter);
+              }}
+              className={`flex items-center gap-1.5 px-2 py-1 rounded-md border transition-colors ${
+                statusFilter.length === 1 && statusFilter.includes('active')
+                  ? 'bg-green-100 dark:bg-green-950/50 border-green-300 dark:border-green-700 text-green-700 dark:text-green-300 font-semibold'
+                  : 'bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800 text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-950/50 hover:border-green-300 dark:hover:border-green-700'
+              }`}
+            >
+              <CheckCircle className="w-3 h-3" />
+              <span className="font-medium">{users.filter(u => u.status === 'active').length}</span>
+              <span>{language === 'fa' ? 'فعال' : 'Active'}</span>
+            </button>
+            
+            <button
+              onClick={() => {
+                if (statusFilter.length === 1 && statusFilter.includes('pending')) {
+                  setStatusFilter(defaultStatusFilter);
+                } else {
+                  setStatusFilter(['pending']);
+                }
+                setRoleFilter(defaultRoleFilter);
+              }}
+              className={`flex items-center gap-1.5 px-2 py-1 rounded-md border transition-colors ${
+                statusFilter.length === 1 && statusFilter.includes('pending')
+                  ? 'bg-yellow-100 dark:bg-yellow-950/50 border-yellow-300 dark:border-yellow-700 text-yellow-700 dark:text-yellow-300 font-semibold'
+                  : 'bg-yellow-50 dark:bg-yellow-950/20 border-yellow-200 dark:border-yellow-800 text-yellow-600 dark:text-yellow-400 hover:bg-yellow-100 dark:hover:bg-yellow-950/50 hover:border-yellow-300 dark:hover:border-yellow-700'
+              }`}
+            >
+              <Clock className="w-3 h-3" />
+              <span className="font-medium">{users.filter(u => u.status === 'pending').length}</span>
+              <span>{language === 'fa' ? 'انتظار' : 'Pending'}</span>
+            </button>
+            
+            <button
+              onClick={() => {
+                if (statusFilter.length === 1 && statusFilter.includes('inactive')) {
+                  setStatusFilter(defaultStatusFilter);
+                } else {
+                  setStatusFilter(['inactive']);
+                }
+                setRoleFilter(defaultRoleFilter);
+              }}
+              className={`flex items-center gap-1.5 px-2 py-1 rounded-md border transition-colors ${
+                statusFilter.length === 1 && statusFilter.includes('inactive')
+                  ? 'bg-red-100 dark:bg-red-950/50 border-red-300 dark:border-red-700 text-red-700 dark:text-red-300 font-semibold'
+                  : 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-950/50 hover:border-red-300 dark:hover:border-red-700'
+              }`}
+            >
+              <AlertCircle className="w-3 h-3" />
+              <span className="font-medium">{users.filter(u => u.status === 'inactive').length}</span>
+              <span>{language === 'fa' ? 'غیرفعال' : 'Inactive'}</span>
+            </button>
+          </>
+        }
+        activeFilters={
+          hasActiveFilters && (
+            <div className="flex items-center gap-1 px-2 py-1 bg-primary/10 text-primary rounded-md text-xs border border-primary/20">
+              <Filter className="w-3 h-3" />
+              <span className="font-medium">{activeFilterCount}</span>
+              <button
+                onClick={() => {
+                  setSearchTerm('');
+                  setRoleFilter(defaultRoleFilter);
+                  setStatusFilter(defaultStatusFilter);
+                }}
+                className="ml-1 hover:bg-primary/20 rounded p-0.5 transition-colors"
+                title={language === 'fa' ? 'بازنشانی فیلترها' : 'Reset filters'}
+              >
+                <X className="w-3 h-3" />
+              </button>
         </div>
-        <div className="flex gap-3">
-          <Button 
-            onClick={() => setShowDeviceModal(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium"
+          )
+        }
+        actions={
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="flex items-center gap-2 px-3 py-1.5 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors text-sm"
           >
-            {t('deviceRequests', language)} ({deviceRequests.filter(r => r.status === 'pending').length})
-          </Button>
-          <Button 
-            onClick={() => setShowCreateModal(true)}
-            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium"
-          >
-            {t('createUser', language)}
-          </Button>
-        </div>
-      </div>
+            <Plus className="w-3 h-3" />
+            {language === 'fa' ? 'افزودن کاربر' : 'Add User'}
+          </button>
+        }
+      />
 
-      {/* Users List */}
-      <Card className="bg-white dark:bg-gray-800 shadow-lg border border-gray-200 dark:border-gray-700">
-        <div className="p-6">
-          <h3 className="text-lg font-semibold mb-6 text-gray-900 dark:text-white">{t('users', language)}</h3>
-          <div className="space-y-4">
-            {users.length === 0 ? (
-              <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-                <div className="text-4xl mb-4">👥</div>
-                <p className="text-lg font-medium">{t('noUsersFound', language)}</p>
-                <p className="text-sm">{t('createFirstUser', language)}</p>
-              </div>
-            ) : (
-              users.map((user) => (
-                <div key={user.id} className="flex items-center justify-between p-6 border border-gray-200 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors">
-                  <div className="flex items-center space-x-4">
-                    <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
-                      <span className="text-blue-600 dark:text-blue-300 font-semibold text-lg">
-                        {user.username.charAt(0).toUpperCase()}
-                      </span>
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-gray-900 dark:text-white text-lg">{user.username}</h4>
-                      <p className="text-gray-600 dark:text-gray-300 text-sm">{user.email}</p>
-                      <p className="text-gray-500 dark:text-gray-400 text-xs">{t('mobile', language)}: {user.mobile}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-4">
-                    {getStatusBadge(user.status)}
-                    {user.device_bound && (
-                      <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900 dark:text-blue-300 dark:border-blue-700">
-                        {t('deviceBound', language)}
-                      </Badge>
-                    )}
-                    {user.status === 'pending' && (
-                      <Button
-                        size="sm"
-                        onClick={() => handleActivateUser(user.username)}
-                        className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-md text-sm font-medium"
-                      >
-                        {t('activate', language)}
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      </Card>
+      {/* Table */}
+      <UsersTable
+        users={filteredAndSortedUsers}
+        loading={false}
+        sortConfig={sortConfig}
+        onSort={handleSort}
+        onActivate={handleActivateUser}
+        onEdit={handleEditUser}
+        onViewDetails={handleViewDetails}
+        onDelete={handleDeleteUser}
+        roleFilter={roleFilter}
+        statusFilter={statusFilter}
+        onRoleFilterChange={setRoleFilter}
+        onStatusFilterChange={setStatusFilter}
+      />
 
-      {/* Create User Modal */}
-      <Modal
-        isOpen={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
-        title={t('createUser', language)}
-      >
-        <div className="space-y-6 p-6">
-          <div>
-            <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">{t('username', language)}</label>
-            <Input
-              value={newUser.username}
-              onChange={(e) => setNewUser({ ...newUser, username: e.target.value })}
-              placeholder={t('enterUsername', language)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">Email</label>
-            <Input
-              type="email"
-              value={newUser.email}
-              onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
-              placeholder="Enter email"
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">{t('mobile', language)}</label>
-            <Input
-              value={newUser.mobile}
-              onChange={(e) => setNewUser({ ...newUser, mobile: e.target.value })}
-              placeholder={t('enterMobile', language)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">{t('policyWindow', language)}</label>
-            <Input
-              value={newUser.policy_window}
-              onChange={(e) => setNewUser({ ...newUser, policy_window: e.target.value })}
-              placeholder="e.g., Mon-Fri 09:00-17:00"
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-            />
-          </div>
-          <div className="flex items-center space-x-3">
-            <input
-              type="checkbox"
-              id="device_binding"
-              checked={newUser.device_binding}
-              onChange={(e) => setNewUser({ ...newUser, device_binding: e.target.checked })}
-              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
-            />
-            <label htmlFor="device_binding" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              {t('requireDeviceBinding', language)}
-            </label>
-          </div>
-          <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200 dark:border-gray-600">
-            <Button 
-              variant="outline" 
-              onClick={() => setShowCreateModal(false)}
-              className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700"
-            >
-              {t('cancel', language)}
-            </Button>
-            <Button 
-              onClick={handleCreateUser}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium"
-            >
-              {t('createUser', language)}
-            </Button>
-          </div>
-        </div>
-      </Modal>
 
-      {/* Device Requests Modal */}
-      <Modal
-        isOpen={showDeviceModal}
-        onClose={() => setShowDeviceModal(false)}
-        title={t('deviceBindingRequests', language)}
-      >
-        <div className="space-y-4 p-6">
-          {deviceRequests.length === 0 ? (
-            <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-              <div className="text-4xl mb-4">📱</div>
-              <p className="text-lg font-medium">{t('noDeviceRequests', language)}</p>
-              <p className="text-sm">{t('allRequestsProcessed', language)}</p>
-            </div>
-          ) : (
-            deviceRequests.map((request) => (
-              <div key={request.username} className="flex items-center justify-between p-4 border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700">
-                <div>
-                  <h4 className="font-semibold text-gray-900 dark:text-white">{request.username}</h4>
-                  <p className="text-sm text-gray-600 dark:text-gray-300">
-                    Fingerprint: {request.fingerprint.substring(0, 20)}...
-                  </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Requested: {new Date(request.created_at).toLocaleString()}
-                  </p>
-                </div>
-                <div className="flex items-center space-x-3">
-                  {getDeviceStatusBadge(request.status)}
-                  {request.status === 'pending' && (
-                    <Button
-                      size="sm"
-                      onClick={() => handleApproveDevice(request.username)}
-                      className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-md text-sm font-medium"
-                    >
-                      {t('approve', language)}
-                    </Button>
-                  )}
-                </div>
-              </div>
-            ))
-          )}
-          <div className="flex justify-end pt-6 border-t border-gray-200 dark:border-gray-600">
-            <Button 
-              variant="outline" 
-              onClick={() => setShowDeviceModal(false)}
-              className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700"
-            >
-              {t('close', language)}
-            </Button>
-          </div>
-        </div>
-      </Modal>
+
+      {/* Add User Modal */}
+      <AddUserModal
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onSubmit={handleAddUser}
+      />
+
+
     </div>
   );
-};
-
-export { UsersSection };
-export default UsersSection;
+}

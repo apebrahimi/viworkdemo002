@@ -1,0 +1,50 @@
+/* table-align.css — semantic alignment that survives RTL & flex wrappers */
+
+/* Base: let table decide layout predictably */
+.table-fixed { 
+  table-layout: fixed; 
+  width: 100%; 
+}
+
+/* Header alignment */
+th.th-center { 
+  text-align: center; 
+}
+th.th-start { 
+  text-align: start; 
+} /* RTL → right, LTR → left */
+th.th-end { 
+  text-align: end; 
+}
+
+/* Cell alignment */
+td.td-center { 
+  text-align: center; 
+}
+td.td-start { 
+  text-align: start; 
+}
+td.td-end { 
+  text-align: end; 
+}
+
+/* If header/cell content uses flex, center it too */
+th.th-center .th-inner,
+td.td-center .td-inner {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Avoid accidental space-between from inherited classes */
+.th-inner, .td-inner {
+  width: 100%;
+}
+
+/* Prevent conflicting utility classes from beating center */
+th.th-center :is(.justify-between,.justify-end,.justify-start){ 
+  justify-content: center; 
+}
+td.td-center :is(.justify-between,.justify-end,.justify-start){ 
+  justify-content: center; 
+}
