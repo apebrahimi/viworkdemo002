@@ -1,6 +1,8 @@
 use actix_web::{web, HttpResponse};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
+use reqwest::Client;
+use tracing::{info, error};
 
 #[derive(Debug, Deserialize)]
 pub struct CreateUserRequest {
@@ -38,39 +40,78 @@ pub struct TerminateSessionResponse {
     pub message: String,
 }
 
-// Mock Gateway Agent endpoints for demo purposes
+// Gateway Agent integration endpoints
 pub async fn create_user(
     pool: web::Data<PgPool>,
     req: web::Json<CreateUserRequest>,
 ) -> Result<HttpResponse, actix_web::Error> {
     let username = req.username.clone();
-    let _password = req.password.clone();
+    let password = req.password.clone();
     
-    // For demo purposes, simulate VPN user creation
-    // In production, this would call the actual Gateway Agent
+    info!("Creating VPN user: {}", username);
     
-    // Log the action
-    let _ = sqlx::query!(
-        r#"
-        INSERT INTO audit_logs (action, resource_type, resource_id, details, created_at)
-        VALUES ($1, $2, $3, $4, NOW())
-        "#,
-        "VPN_USER_CREATED",
-        "user",
-        username,
-        serde_json::json!({
+    // Call the Gateway Agent to create the VPN user
+    let client = Client::new();
+    let gateway_agent_url = std::env::var("GATEWAY_AGENT_URL")
+        .unwrap_or_else(|_| "http://localhost:8443".to_string());
+    
+    let command_request = serde_json::json!({
+        "command": "openvpn_create",
+        "params": {
             "username": username,
-            "action": "vpn_user_created",
-            "timestamp": chrono::Utc::now().to_rfc3339()
-        })
-    )
-    .execute(pool.get_ref())
-    .await;
+            "password": password
+        }
+    });
     
-    Ok(HttpResponse::Ok().json(CreateUserResponse {
-        ok: true,
-        message: "VPN user created successfully".to_string(),
-    }))
+    match client
+        .post(&format!("{}/api/v1/command", gateway_agent_url))
+        .json(&command_request)
+        .send()
+        .await
+    {
+        Ok(response) => {
+            if response.status().is_success() {
+                info!("VPN user created successfully via Gateway Agent: {}", username);
+                
+                // Log the action
+                let _ = sqlx::query!(
+                    r#"
+                    INSERT INTO audit_logs (action, resource_type, resource_id, details, created_at)
+                    VALUES ($1, $2, $3, $4, NOW())
+                    "#,
+                    "VPN_USER_CREATED",
+                    "user",
+                    username,
+                    serde_json::json!({
+                        "username": username,
+                        "action": "vpn_user_created",
+                        "gateway_agent": true,
+                        "timestamp": chrono::Utc::now().to_rfc3339()
+                    })
+                )
+                .execute(pool.get_ref())
+                .await;
+                
+                Ok(HttpResponse::Ok().json(CreateUserResponse {
+                    ok: true,
+                    message: "VPN user created successfully via Gateway Agent".to_string(),
+                }))
+            } else {
+                error!("Gateway Agent returned error status: {}", response.status());
+                Ok(HttpResponse::InternalServerError().json(CreateUserResponse {
+                    ok: false,
+                    message: "Failed to create VPN user via Gateway Agent".to_string(),
+                }))
+            }
+        }
+        Err(e) => {
+            error!("Failed to call Gateway Agent: {}", e);
+            Ok(HttpResponse::InternalServerError().json(CreateUserResponse {
+                ok: false,
+                message: format!("Failed to connect to Gateway Agent: {}", e),
+            }))
+        }
+    }
 }
 
 pub async fn spawn_container(
@@ -80,42 +121,83 @@ pub async fn spawn_container(
     let username = req.username.clone();
     let session_id = req.session_id.clone();
     
-    // Generate random path and port for demo
-    let random_path = generate_random_path();
-    let port = 5801; // In production, this would be dynamically assigned
-    let container_id = format!("firefox-{}", port);
+    info!("Spawning container for user: {}, session: {}", username, session_id);
     
-    // For demo purposes, simulate container spawning
-    // In production, this would call Docker API via Gateway Agent
+    // Call the Gateway Agent to spawn a container
+    let client = Client::new();
+    let gateway_agent_url = std::env::var("GATEWAY_AGENT_URL")
+        .unwrap_or_else(|_| "http://localhost:8443".to_string());
     
-    // Log the action
-    let _ = sqlx::query!(
-        r#"
-        INSERT INTO audit_logs (action, resource_type, resource_id, details, created_at)
-        VALUES ($1, $2, $3, $4, NOW())
-        "#,
-        "CONTAINER_SPAWNED",
-        "session",
-        session_id,
-        serde_json::json!({
+    let command_request = serde_json::json!({
+        "command": "docker_spawn",
+        "params": {
             "username": username,
             "session_id": session_id,
-            "container_id": container_id,
-            "port": port,
-            "url_path": random_path,
-            "timestamp": chrono::Utc::now().to_rfc3339()
-        })
-    )
-    .execute(pool.get_ref())
-    .await;
+            "image": "viworks/chrome:latest"
+        }
+    });
     
-    let url = format!("https://gw.example.com/{}/", random_path);
-    
-    Ok(HttpResponse::Ok().json(SpawnContainerResponse {
-        url,
-        port,
-        container_id,
-    }))
+    match client
+        .post(&format!("{}/api/v1/command", gateway_agent_url))
+        .json(&command_request)
+        .send()
+        .await
+    {
+        Ok(response) => {
+            if response.status().is_success() {
+                let response_data: serde_json::Value = response.json().await
+                    .unwrap_or_else(|_| serde_json::json!({"error": "Failed to parse response"}));
+                
+                info!("Container spawned successfully via Gateway Agent: {}", session_id);
+                
+                // Log the action
+                let _ = sqlx::query!(
+                    r#"
+                    INSERT INTO audit_logs (action, resource_type, resource_id, details, created_at)
+                    VALUES ($1, $2, $3, $4, NOW())
+                    "#,
+                    "CONTAINER_SPAWNED",
+                    "session",
+                    session_id,
+                    serde_json::json!({
+                        "username": username,
+                        "session_id": session_id,
+                        "gateway_agent": true,
+                        "response": response_data,
+                        "timestamp": chrono::Utc::now().to_rfc3339()
+                    })
+                )
+                .execute(pool.get_ref())
+                .await;
+                
+                // Extract container info from response
+                let container_id = response_data["container_id"].as_str().unwrap_or("unknown");
+                let port = response_data["port"].as_u64().unwrap_or(5801) as u16;
+                let url = response_data["url"].as_str().unwrap_or("https://gw.example.com/");
+                
+                Ok(HttpResponse::Ok().json(SpawnContainerResponse {
+                    url: url.to_string(),
+                    port,
+                    container_id: container_id.to_string(),
+                }))
+            } else {
+                error!("Gateway Agent returned error status: {}", response.status());
+                Ok(HttpResponse::InternalServerError().json(SpawnContainerResponse {
+                    url: "".to_string(),
+                    port: 0,
+                    container_id: "".to_string(),
+                }))
+            }
+        }
+        Err(e) => {
+            error!("Failed to call Gateway Agent: {}", e);
+            Ok(HttpResponse::InternalServerError().json(SpawnContainerResponse {
+                url: "".to_string(),
+                port: 0,
+                container_id: "".to_string(),
+            }))
+        }
+    }
 }
 
 pub async fn terminate_session(
@@ -124,27 +206,49 @@ pub async fn terminate_session(
 ) -> Result<HttpResponse, actix_web::Error> {
     let session_id = req.session_id.clone();
     
-    // For demo purposes, simulate session termination
-    // In production, this would call the Gateway Agent to stop containers and VPN sessions
+    info!("Terminating session: {}", session_id);
     
-    // Log the action
-    let _ = sqlx::query!(
-        r#"
-        INSERT INTO audit_logs (action, resource_type, resource_id, details, created_at)
-        VALUES ($1, $2, $3, $4, NOW())
-        "#,
-        "SESSION_TERMINATED_BY_ADMIN",
-        "session",
-        session_id,
-        serde_json::json!({
-            "session_id": session_id,
-            "action": "session_terminated",
-            "terminated_by": "admin",
-            "timestamp": chrono::Utc::now().to_rfc3339()
-        })
-    )
-    .execute(pool.get_ref())
-    .await;
+    // Call the Gateway Agent to terminate the session
+    let client = Client::new();
+    let gateway_agent_url = std::env::var("GATEWAY_AGENT_URL")
+        .unwrap_or_else(|_| "http://localhost:8443".to_string());
+    
+    let command_request = serde_json::json!({
+        "command": "session_terminate",
+        "params": {
+            "session_id": session_id
+        }
+    });
+    
+    match client
+        .post(&format!("{}/api/v1/command", gateway_agent_url))
+        .json(&command_request)
+        .send()
+        .await
+    {
+        Ok(response) => {
+            if response.status().is_success() {
+                info!("Session terminated successfully via Gateway Agent: {}", session_id);
+                
+                // Log the action
+                let _ = sqlx::query!(
+                    r#"
+                    INSERT INTO audit_logs (action, resource_type, resource_id, details, created_at)
+                    VALUES ($1, $2, $3, $4, NOW())
+                    "#,
+                    "SESSION_TERMINATED_BY_ADMIN",
+                    "session",
+                    session_id,
+                    serde_json::json!({
+                        "session_id": session_id,
+                        "action": "session_terminated",
+                        "terminated_by": "admin",
+                        "gateway_agent": true,
+                        "timestamp": chrono::Utc::now().to_rfc3339()
+                    })
+                )
+                .execute(pool.get_ref())
+                .await;
     
     Ok(HttpResponse::Ok().json(TerminateSessionResponse {
         terminated: true,
