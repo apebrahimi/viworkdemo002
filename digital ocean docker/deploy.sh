@@ -15,7 +15,7 @@ docker-compose down --remove-orphans || true
 
 # Force remove any lingering containers with our names
 echo "🧹 Force removing any lingering containers..."
-docker rm -f viworks-backend viworks-frontend viworks-postgres viworks-redis 2>/dev/null || true
+docker rm -f MacbookM3agentviworks-backend viworks-frontend viworks-postgres viworks-redis 2>/dev/null || true
 
 # Remove old images to free space
 echo "🧹 Cleaning up old images..."

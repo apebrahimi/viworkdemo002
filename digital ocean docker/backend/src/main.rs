@@ -192,10 +192,43 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WebSocketActor {
 
 // API Handlers
 async fn health_check() -> HttpResponse {
+    // Check database connectivity
+    let db_status = match std::env::var("DATABASE_URL") {
+        Ok(url) => {
+            if url.contains("postgres") {
+                "configured"
+            } else {
+                "misconfigured"
+            }
+        }
+        Err(_) => "not_set"
+    };
+    
+    // Check Redis connectivity
+    let redis_status = match std::env::var("REDIS_URL") {
+        Ok(url) => {
+            if url.contains("redis") {
+                "configured"
+            } else {
+                "misconfigured"
+            }
+        }
+        Err(_) => "not_set"
+    };
+    
     HttpResponse::Ok().json(serde_json::json!({
         "status": "healthy",
         "timestamp": Utc::now().to_rfc3339(),
-        "version": "1.0.0"
+        "version": "1.0.0",
+        "services": {
+            "database": db_status,
+            "redis": redis_status,
+            "network": "operational"
+        },
+        "environment": {
+            "host": std::env::var("HOST").unwrap_or_else(|_| "0.0.0.0".to_string()),
+            "port": std::env::var("PORT").unwrap_or_else(|_| "8081".to_string())
+        }
     }))
 }
 
@@ -624,6 +657,14 @@ async fn main() -> std::io::Result<()> {
     env_logger::init();
     log::info!("🚀 Starting ViWorkS Admin Backend...");
     
+    // Log environment variables for debugging
+    log::info!("🔧 Environment Configuration:");
+    log::info!("  HOST: {}", std::env::var("HOST").unwrap_or_else(|_| "0.0.0.0".to_string()));
+    log::info!("  PORT: {}", std::env::var("PORT").unwrap_or_else(|_| "8081".to_string()));
+    log::info!("  RUST_LOG: {}", std::env::var("RUST_LOG").unwrap_or_else(|_| "info".to_string()));
+    log::info!("  DATABASE_URL: {}", std::env::var("DATABASE_URL").unwrap_or_else(|_| "not set".to_string()));
+    log::info!("  REDIS_URL: {}", std::env::var("REDIS_URL").unwrap_or_else(|_| "not set".to_string()));
+    
     // Set up panic hook to catch panics
     std::panic::set_hook(Box::new(|panic_info| {
         eprintln!("Application panicked: {:?}", panic_info);
@@ -632,13 +673,43 @@ async fn main() -> std::io::Result<()> {
     
     log::info!("📊 Initializing database connection...");
     
-    // Database connection
-    let database_url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgresql://postgres:password@localhost:5432/viworks_admin".to_string());
+    // Check network connectivity first
+    log::info!("🌐 Checking network connectivity...");
+    let postgres_host = std::env::var("POSTGRES_HOST").unwrap_or_else(|_| "postgres".to_string());
+    let postgres_port = std::env::var("POSTGRES_PORT").unwrap_or_else(|_| "5432".to_string());
     
-    let pool = PgPool::connect(&database_url)
-        .await
-        .expect("Failed to connect to database");
+    log::info!("🔍 Checking connectivity to {}:{}", postgres_host, postgres_port);
+    
+    // Database connection with retry logic
+    let database_url = std::env::var("DATABASE_URL")
+        .unwrap_or_else(|_| "postgresql://postgres:password@localhost:5432/viworks".to_string());
+    
+    log::info!("🔗 Attempting to connect to database: {}", database_url);
+    
+    // Retry database connection with exponential backoff
+    let mut retry_count = 0;
+    let max_retries = 5;
+    let pool = loop {
+        match PgPool::connect(&database_url).await {
+            Ok(pool) => {
+                log::info!("✅ Database connected successfully");
+                break pool;
+            }
+            Err(e) => {
+                retry_count += 1;
+                if retry_count >= max_retries {
+                    log::error!("❌ Failed to connect to database after {} attempts: {}", max_retries, e);
+                    log::error!("🔍 Database URL: {}", database_url);
+                    log::error!("🌐 Network check: Make sure PostgreSQL is accessible from this container");
+                    std::process::exit(1);
+                }
+                let delay = std::time::Duration::from_secs(2u64.pow(retry_count as u32));
+                log::warn!("⚠️  Database connection attempt {} failed: {}", retry_count, e);
+                log::info!("⏳ Retrying in {} seconds...", delay.as_secs());
+                tokio::time::sleep(delay).await;
+            }
+        }
+    };
     
     log::info!("✅ Database connected successfully");
     log::info!("🌐 Starting HTTP server on 0.0.0.0:8081...");
