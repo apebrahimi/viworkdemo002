@@ -56,15 +56,13 @@ RUN apk add --no-cache \
 
 WORKDIR /app
 
-# Copy binary & entrypoint
+# Copy binary & migrations
 COPY --from=builder /app/target/release/viworks-admin-backend /app/app
 COPY --from=builder /app/migrations /app/migrations
-COPY ops/entrypoint.sh /app/entrypoint.sh
 
 # Create non-root user
 RUN adduser -D -u 10001 appuser && \
-    chown -R appuser:appuser /app && \
-    chmod +x /app/entrypoint.sh
+    chown -R appuser:appuser /app
 
 # Set environment variables
 ENV RUST_LOG=info \
@@ -84,6 +82,5 @@ EXPOSE 8081
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:8081/health || exit 1
 
-# Use dumb-init for proper signal handling
-ENTRYPOINT ["/usr/bin/dumb-init", "--"]
-CMD ["/app/entrypoint.sh", "/app/app"]
+# Use dumb-init for proper signal handling and exec the app directly
+ENTRYPOINT ["/usr/bin/dumb-init", "--", "/app/app"]
