@@ -50,6 +50,7 @@ RUN apk add --no-cache \
     wget \
     curl \
     tzdata \
+    bash \
     postgresql-client \
     redis
 

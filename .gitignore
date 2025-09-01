@@ -99,8 +99,9 @@ temp/
 0 temp/
 
 # Rust specific
-Cargo.lock
+# Keep Cargo.lock for binary crates like `os agent` (needed for Docker builds)
 *.rs.bk
+!os agent/Cargo.lock
 
 # Database
 *.db

@@ -1,5 +1,5 @@
 # Multi-stage build for minimal production image
-FROM rust:1.75-alpine as builder
+FROM rust:1.89.0-alpine as builder
 
 # Install build dependencies
 RUN apk update && apk add --no-cache \
