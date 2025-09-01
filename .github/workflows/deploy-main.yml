@@ -1,5 +1,6 @@
 name: Deploy ViWorks to DigitalOcean
 
+# Trigger CI/CD deployment pipeline - re-run deployment
 on:
   push:
     branches: [ main, master ]
