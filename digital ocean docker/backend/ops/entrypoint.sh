@@ -50,12 +50,5 @@ if [ ! -f "/app/app" ]; then
 fi
 
 log "🚀 Launching app..."
-set +e
-"$@"
-RC=$?
-set -e
-log "🛑 App exited with code $RC"
-
-# Give the logger a moment to flush
-sleep 0.5
-exit "$RC"
+# Execute the application in the foreground (replace current process)
+exec "$@"
