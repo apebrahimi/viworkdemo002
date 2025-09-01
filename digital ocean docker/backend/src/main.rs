@@ -3,8 +3,8 @@ use actix_cors::Cors;
 use actix_web_actors::ws;
 use actix::{Actor, StreamHandler};
 use serde::{Deserialize, Serialize};
-use tracing::info;
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+// use tracing::info;
+// use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use sqlx::PgPool;
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -199,7 +199,7 @@ async fn health_check(pool: web::Data<PgPool>) -> HttpResponse {
     let db_start = std::time::Instant::now();
     let db_result = tokio::time::timeout(
         std::time::Duration::from_secs(5),
-        sqlx::query!("SELECT 1 as test").fetch_one(pool.get_ref())
+        sqlx::query("SELECT 1 as test").fetch_one(pool.get_ref())
     ).await;
     let db_response_time = db_start.elapsed().as_millis() as u64;
 
@@ -628,7 +628,7 @@ async fn create_admin_user(req: web::Json<serde_json::Value>) -> HttpResponse {
     }))
 }
 
-async fn activate_admin_user(req: web::Json<serde_json::Value>) -> HttpResponse {
+async fn activate_admin_user(_req: web::Json<serde_json::Value>) -> HttpResponse {
     HttpResponse::Ok().json(serde_json::json!({
         "success": true,
         "message": "User activated successfully"
@@ -671,7 +671,7 @@ async fn get_device_requests() -> HttpResponse {
     }))
 }
 
-async fn approve_device(req: web::Json<serde_json::Value>) -> HttpResponse {
+async fn approve_device(_req: web::Json<serde_json::Value>) -> HttpResponse {
     HttpResponse::Ok().json(serde_json::json!({
         "success": true,
         "message": "Device approved successfully"
