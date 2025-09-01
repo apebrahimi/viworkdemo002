@@ -9,13 +9,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: "10.15.0"
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-          cache: "pnpm"
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
@@ -25,13 +21,23 @@ jobs:
           curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sudo sh -s -- -b /usr/local/bin
       - name: Run audit
         run: |
-          chmod +x scripts/project_audit.sh
-          ./scripts/project_audit.sh || true
-      - name: Upload report
+          echo "🧾 Running project audit..."
+          echo "📁 Checking project structure..."
+          ls -la
+          echo "📦 Checking frontend dependencies..."
+          cd "digital ocean docker/frontend"
+          npm audit --audit-level=moderate || echo "⚠️  Some vulnerabilities found"
+          echo "🔍 Checking backend dependencies..."
+          cd ../backend
+          cargo audit || echo "⚠️  Some vulnerabilities found"
+          echo "✅ Audit completed"
+      - name: Upload audit logs
         uses: actions/upload-artifact@v4
         with:
-          name: audit-report
-          path: audit-report.md
+          name: audit-logs
+          path: |
+            digital ocean docker/frontend/npm-debug.log
+            digital ocean docker/backend/target/cargo-audit.log
       - name: PR comment (short)
         if: github.event_name == 'pull_request'
         uses: thollander/actions-comment-pull-request@v3
