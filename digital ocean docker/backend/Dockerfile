@@ -82,7 +82,7 @@ EXPOSE 8081
 
 # Health check (give server time to initialize DB connection)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=10 \
-    CMD curl -sfm 2 http://localhost:8081/health || exit 1
+    CMD curl -sfm 5 http://localhost:8081/health || exit 1
 
 # Use dumb-init for proper signal handling
 ENTRYPOINT ["/usr/bin/dumb-init", "--"]

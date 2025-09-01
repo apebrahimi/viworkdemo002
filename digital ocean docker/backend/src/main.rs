@@ -191,44 +191,77 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WebSocketActor {
 }
 
 // API Handlers
-async fn health_check() -> HttpResponse {
-    // Check database connectivity
-    let db_status = match std::env::var("DATABASE_URL") {
-        Ok(url) => {
-            if url.contains("postgres") {
-                "configured"
-            } else {
-                "misconfigured"
-            }
-        }
-        Err(_) => "not_set"
+async fn health_check(pool: web::Data<PgPool>) -> HttpResponse {
+    let start_time = std::time::Instant::now();
+    let timestamp = Utc::now();
+
+    // Check database connectivity with actual query
+    let db_start = std::time::Instant::now();
+    let db_result = tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        sqlx::query!("SELECT 1 as test").fetch_one(pool.get_ref())
+    ).await;
+    let db_response_time = db_start.elapsed().as_millis() as u64;
+
+    let (db_status, db_error) = match db_result {
+        Ok(Ok(_)) => ("healthy", None),
+        Ok(Err(e)) => ("unhealthy", Some(e.to_string())),
+        Err(e) => ("unhealthy", Some(format!("Database query timeout: {}", e))),
     };
-    
-    // Check Redis connectivity
-    let redis_status = match std::env::var("REDIS_URL") {
-        Ok(url) => {
-            if url.contains("redis") {
-                "configured"
-            } else {
-                "misconfigured"
-            }
-        }
-        Err(_) => "not_set"
+
+    // Check Redis connectivity (placeholder - would need Redis client)
+    let redis_status = "unknown";
+    let redis_error = Some("Redis client not implemented".to_string());
+
+    // Determine overall status
+    let overall_status = if db_status == "healthy" {
+        "healthy"
+    } else {
+        "unhealthy"
     };
-    
-    HttpResponse::Ok().json(serde_json::json!({
-        "status": "healthy",
-        "timestamp": Utc::now().to_rfc3339(),
+
+    let response = serde_json::json!({
+        "status": overall_status,
+        "timestamp": timestamp.to_rfc3339(),
         "version": "1.0.0",
+        "uptime": "0h 0m 0s", // Placeholder
         "services": {
-            "database": db_status,
-            "redis": redis_status,
-            "network": "operational"
+            "database": {
+                "status": db_status,
+                "response_time_ms": db_response_time,
+                "error": db_error
+            },
+            "redis": {
+                "status": redis_status,
+                "error": redis_error
+            },
+            "overall": {
+                "status": overall_status,
+                "response_time_ms": start_time.elapsed().as_millis() as u64
+            }
         },
         "environment": {
             "host": std::env::var("HOST").unwrap_or_else(|_| "0.0.0.0".to_string()),
             "port": std::env::var("PORT").unwrap_or_else(|_| "8081".to_string())
         }
+    });
+
+    // Log health check result for debugging
+    if overall_status == "healthy" {
+        log::debug!("Health check passed: database={}, response_time={}ms", db_status, db_response_time);
+        HttpResponse::Ok().json(response)
+    } else {
+        log::warn!("Health check failed: database={}, error={:?}", db_status, db_error);
+        HttpResponse::ServiceUnavailable().json(response)
+    }
+}
+
+async fn health_check_simple() -> HttpResponse {
+    HttpResponse::Ok().json(serde_json::json!({
+        "status": "ok",
+        "timestamp": Utc::now().to_rfc3339(),
+        "version": "1.0.0",
+        "message": "Service is running"
     }))
 }
 
@@ -725,8 +758,9 @@ async fn main() -> std::io::Result<()> {
             .wrap(cors)
             .app_data(web::Data::new(pool.clone()))
             
-            // Health check
+            // Health check endpoints
             .route("/health", web::get().to(health_check))
+            .route("/health/simple", web::get().to(health_check_simple))
             
             // WebSocket
             .route("/ws", web::get().to(ws_handler))

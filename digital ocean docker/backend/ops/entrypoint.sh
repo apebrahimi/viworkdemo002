@@ -39,8 +39,16 @@ done
 log "🔧 Checking database migrations..."
 if [ -d "/app/migrations" ]; then
     log "📋 Running database migrations..."
-    # Note: Add migration command here if you have a migration tool
-    # Example: /app/migrate up
+    # Use psql to run migrations
+    for migration_file in /app/migrations/*.sql; do
+        if [ -f "$migration_file" ]; then
+            log "📄 Running migration: $(basename "$migration_file")"
+            PGPASSWORD="${POSTGRES_PASSWORD:-viworks_password_2024}" psql -h postgres -p 5432 -U admin -d viworks -f "$migration_file" || {
+                log "⚠️  Migration $(basename "$migration_file") failed, but continuing..."
+            }
+        fi
+    done
+    log "✅ Database migrations completed"
 fi
 
 # Check if binary exists
