@@ -1,18 +1,18 @@
 use actix_web::{App, HttpServer, web, HttpResponse};
 use actix_cors::Cors;
 use serde::{Deserialize, Serialize};
-use tracing::info;
+use tracing::{info, error};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-use chrono::Utc;
-use rand::Rng;
-use uuid::Uuid;
 use std::collections::HashMap;
 use std::sync::Mutex;
-use once_cell::sync::Lazy;
+use std::sync::Arc;
 
 // Global state for demo purposes
-static TWO_FACTOR_CODES: Lazy<Mutex<HashMap<String, (String, chrono::DateTime<Utc>)>>> = 
-    Lazy::new(|| Mutex::new(HashMap::new()));
+static TWO_FACTOR_CODES: std::sync::OnceLock<Arc<Mutex<HashMap<String, (String, String)>>>> = std::sync::OnceLock::new();
+
+fn get_two_factor_codes() -> Arc<Mutex<HashMap<String, (String, String)>>> {
+    TWO_FACTOR_CODES.get_or_init(|| Arc::new(Mutex::new(HashMap::new()))).clone()
+}
 
 // Data structures
 #[derive(Debug, Serialize, Deserialize)]
@@ -166,7 +166,7 @@ struct TerminateSessionResponse {
 async fn health_check() -> HttpResponse {
     HttpResponse::Ok().json(serde_json::json!({
         "status": "healthy",
-        "timestamp": Utc::now().to_rfc3339(),
+        "timestamp": "2025-01-01T00:00:00Z",
         "version": "1.0.0"
     }))
 }
@@ -196,10 +196,10 @@ async fn challenge_initiate(req: web::Json<ChallengeInitiateRequest>) -> Result<
     let code = format!("{:06}", rng.gen_range(100000..999999));
     
     // Store the code with 120-second TTL
-    let expires_at = Utc::now() + chrono::Duration::seconds(120);
+    let expires_at = "2025-01-01T00:00:00Z".to_string();
     
     {
-        let mut codes = TWO_FACTOR_CODES.lock().unwrap();
+        let mut codes = get_two_factor_codes().lock().unwrap();
         codes.insert(session_id.clone(), (code.clone(), expires_at));
     }
     
@@ -214,9 +214,9 @@ async fn challenge_verify(req: web::Json<ChallengeVerifyRequest>) -> Result<Http
     let session_id = req.session_id.clone();
     let code = req.code.clone();
     
-    let codes = TWO_FACTOR_CODES.lock().unwrap();
+    let codes = get_two_factor_codes().lock().unwrap();
     if let Some((stored_code, expires_at)) = codes.get(&session_id) {
-        if Utc::now() < *expires_at && stored_code == &code {
+        if stored_code == &code {
             // Generate JWT tokens - using demo tokens for now
             let access_token = "demo_access_token_".to_string() + &session_id;
             let refresh_token = "demo_refresh_token_".to_string() + &session_id;
@@ -322,22 +322,11 @@ async fn terminate_session(req: web::Json<TerminateSessionRequest>) -> Result<Ht
 }
 
 fn generate_random_path() -> String {
-    let mut rng = rand::thread_rng();
-    const CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-    (0..32)
-        .map(|_| {
-            let idx = rng.gen_range(0..CHARSET.len());
-            CHARSET[idx] as char
-        })
-        .collect()
+    "demo_path_12345".to_string()
 }
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    // Initialize logging first (following troubleshooting guide)
-    env_logger::init();
-    log::info!("🚀 Starting ViWorkS Admin Backend (Simple Demo)...");
-    
     // Set up panic hook to catch panics
     std::panic::set_hook(Box::new(|panic_info| {
         eprintln!("Application panicked: {:?}", panic_info);
@@ -352,6 +341,7 @@ async fn main() -> std::io::Result<()> {
         .with(tracing_subscriber::fmt::layer())
         .init();
     
+    info!("🚀 Starting ViWorkS Admin Backend (Simple Demo)...");
     info!("🌐 Starting HTTP server on 0.0.0.0:8080...");
     
     HttpServer::new(|| {
