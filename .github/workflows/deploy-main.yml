@@ -128,8 +128,8 @@ jobs:
           
           # Ensure networks exist for two-network architecture
           echo "🌐 Setting up two-network security architecture..."
-          docker network create viworks-public 2>/dev/null || echo "Network viworks-public already exists"
-          docker network create viworks-internal 2>/dev/null || echo "Network viworks-internal already exists"
+          docker network create --driver bridge viworks-public 2>/dev/null || echo "Network viworks-public already exists"
+          docker network create --driver bridge --internal viworks-internal 2>/dev/null || echo "Network viworks-internal already exists"
           
           # Build and start new containers with two-network setup
           echo "🔨 Building and starting new containers with two-network security..."

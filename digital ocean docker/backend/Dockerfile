@@ -21,7 +21,7 @@ COPY Cargo.toml Cargo.lock* ./
 # Create a dummy main.rs to build dependencies
 RUN mkdir src && echo "fn main() {}" > src/main.rs
 
-# Build dependencies
+# Build dependencies (warm cache)
 RUN cargo build --release
 
 # Remove dummy main.rs and copy real source
@@ -35,8 +35,8 @@ RUN cargo audit || echo "⚠️  Security vulnerabilities detected - review requ
 # Security check: Verify no unwanted dependencies
 RUN cargo tree | grep -i "mysql\|rsa" && echo "⚠️  WARNING: Unwanted dependencies found" || echo "✅ Dependencies verified"
 
-# Build the application (force rebuild by cleaning and rebuilding)
-RUN cargo clean && cargo build --release
+# Build the application
+RUN cargo build --release
 
 # Runtime stage (Alpine)
 FROM alpine:3.22

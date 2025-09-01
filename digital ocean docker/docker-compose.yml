@@ -143,13 +143,8 @@ volumes:
 networks:
   # Public network - only nginx is exposed
   viworks-public:
-    driver: bridge
-    driver_opts:
-      com.docker.network.bridge.name: viworks-public
+    external: true
   
   # Internal network - all services communicate here
   viworks-internal:
-    driver: bridge
-    driver_opts:
-      com.docker.network.bridge.name: viworks-internal
-    internal: true  # No external access
+    external: true
