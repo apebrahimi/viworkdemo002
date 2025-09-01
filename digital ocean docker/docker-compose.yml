@@ -97,6 +97,43 @@ services:
       timeout: 10s
       retries: 3
 
+  # Website (Internal Network Only)
+  website:
+    build:
+      context: ../websitejadid
+      dockerfile: Dockerfile
+    container_name: viworks-website
+    env_file:
+      - ./env.production
+    networks:
+      - viworks-internal
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ViWorks Agent (Internal Network Only)
+  agent:
+    build:
+      context: ../os agent
+      dockerfile: Dockerfile.alpine-production
+    container_name: viworks-agent
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - RUST_LOG=info
+      - AGENT_CONFIG=/etc/viworks/agent.toml
+    networks:
+      - viworks-internal
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8443/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
 volumes:
   postgres_data:
     driver: local
