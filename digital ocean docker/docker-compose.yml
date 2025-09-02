@@ -8,7 +8,7 @@ services:
       - "443:443"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/ssl:/etc/letsencrypt:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
     networks:
       - viworks-public
       - viworks-internal
@@ -73,7 +73,7 @@ services:
       dockerfile: Dockerfile.fixed
     container_name: viworks-backend
     env_file:
-      - ./env.production
+      - ./env.backend
     volumes:
       - ./backend/logs:/app/logs
     depends_on:
@@ -103,7 +103,7 @@ services:
       dockerfile: Dockerfile
     container_name: viworks-frontend
     env_file:
-      - ./env.production
+      - ./env.frontend
     depends_on:
       - backend
     networks:
@@ -123,7 +123,7 @@ services:
       dockerfile: Dockerfile
     container_name: viworks-website
     env_file:
-      - ./env.production
+      - ./env.website
     networks:
       - viworks-internal
     restart: unless-stopped
