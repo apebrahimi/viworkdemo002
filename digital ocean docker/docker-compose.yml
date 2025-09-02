@@ -14,11 +14,11 @@ services:
       - viworks-internal
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "nginx -t && curl -f http://localhost:80/ || exit 1"]
-      interval: 30s
-      timeout: 15s
-      retries: 10
-      start_period: 60s
+      test: ["CMD-SHELL", "nginx -t && curl -fsS http://localhost/_health || exit 1"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
     logging:
       driver: "json-file"
       options:
@@ -86,10 +86,10 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8081/health/readiness || exit 1"]
-      interval: 45s
-      timeout: 20s
-      retries: 15
-      start_period: 180s
+      interval: 30s
+      timeout: 15s
+      retries: 5
+      start_period: 60s
     logging:
       driver: "json-file"
       options:
@@ -112,10 +112,10 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:3000/ || exit 1"]
-      interval: 30s
-      timeout: 15s
-      retries: 15
-      start_period: 120s
+      interval: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
 
   # Website (Internal Network Only)
   website:
@@ -130,31 +130,31 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:3000/ || exit 1"]
-      interval: 30s
-      timeout: 15s
-      retries: 15
-      start_period: 120s
-
-  # ViWorks Agent (Internal Network Only)
-  agent:
-    build:
-      context: ../os agent
-      dockerfile: Dockerfile.alpine-production
-    container_name: viworks-agent
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    environment:
-      - RUST_LOG=info
-      - AGENT_CONFIG=/etc/viworks/agent.toml
-    networks:
-      - viworks-internal
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8443/api/v1/health"]
-      interval: 30s
+      interval: 20s
       timeout: 10s
-      retries: 3
-      start_period: 30s
+      retries: 5
+      start_period: 60s
+
+  # ViWorks Agent (Internal Network Only) - DISABLED FOR NOW
+  # agent:
+  #   build:
+  #     context: ../os agent
+  #     dockerfile: Dockerfile.alpine-production
+  #   container_name: viworks-agent
+  #   volumes:
+  #     - /var/run/docker.sock:/var/run/docker.sock
+  #   environment:
+  #     - RUST_LOG=info
+  #     - AGENT_CONFIG=/etc/viworks/agent.toml
+  #   networks:
+  #     - viworks-internal
+  #   restart: unless-stopped
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:8443/api/v1/health"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+  #     start_period: 30s
 
 volumes:
   postgres_data:
@@ -166,7 +166,9 @@ networks:
   # Public network - only nginx is exposed
   viworks-public:
     external: true
+    name: viworks-public
   
   # Internal network - all services communicate here
   viworks-internal:
     external: true
+    name: viworks-internal

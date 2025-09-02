@@ -9,6 +9,11 @@ if [ ! -f "docker-compose.yml" ]; then
     exit 1
 fi
 
+# Setup networks first
+echo "🔧 Setting up Docker networks..."
+chmod +x ./setup-networks.sh
+./setup-networks.sh
+
 # Stop and remove existing containers with force
 echo "🛑 Stopping and removing existing containers..."
 docker-compose down --remove-orphans || true
