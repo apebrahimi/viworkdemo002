@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useWebSocket, WebSocketMessage } from '@/hooks/useWebSocket';
-import { useAuth } from './AuthContext';
+import { useAdminAuth } from './AdminAuthContext';
 
 interface RealtimeContextType {
   isConnected: boolean;
@@ -27,7 +27,7 @@ interface RealtimeProviderProps {
 }
 
 export const RealtimeProvider: React.FC<RealtimeProviderProps> = ({ children }) => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated } = useAdminAuth();
   const [wsUrl, setWsUrl] = useState<string>('');
   
   // Create WebSocket URL based on environment

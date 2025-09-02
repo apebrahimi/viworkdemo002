@@ -20,6 +20,8 @@ const nextConfig: NextConfig = {
   experimental: {
     // Experimental features for better standalone support
   },
+  // Disable prerendering for pages that use client-side hooks
+  generateStaticParams: false,
   // Ensure proper build output
   distDir: '.next',
   cleanDistDir: true,
