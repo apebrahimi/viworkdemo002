@@ -53,32 +53,9 @@ if ! PGPASSWORD="${POSTGRES_PASSWORD:-viworks_password_2024}" psql -h postgres -
 fi
 log "✅ Database connectivity test passed"
 
-    # Run database migrations if needed with better error handling
-    log "🔧 Checking database migrations..."
-    if [ -d "/app/migrations" ]; then
-        log "📋 Running database migrations..."
-        migration_errors=0
-        
-        for migration_file in /app/migrations/*.sql; do
-            if [ -f "$migration_file" ]; then
-                log "📄 Running migration: $(basename "$migration_file")"
-                if PGPASSWORD="${POSTGRES_PASSWORD:-viworks_password_2024}" psql -h postgres -p 5432 -U admin -d viworks -f "$migration_file" 2>&1; then
-                    log "✅ Migration $(basename "$migration_file") completed successfully"
-                else
-                    log "⚠️  Migration $(basename "$migration_file") failed, but continuing..."
-                    ((migration_errors++))
-                fi
-            fi
-        done
-        
-        if [ $migration_errors -gt 0 ]; then
-            log "⚠️  $migration_errors migration(s) had errors, but continuing..."
-        else
-            log "✅ All database migrations completed successfully"
-        fi
-    else
-        log "ℹ️  No migrations directory found, skipping migrations"
-    fi
+    # Skip migrations here - they will be run by the backend in background
+    log "⏭️  Skipping migrations in entrypoint (handled by backend)"
+    log "📋 Migrations will run automatically after backend starts"
 
 # Check if binary exists
 if [ ! -f "/app/app" ]; then

@@ -73,6 +73,15 @@ async fn readiness_check(pool: web::Data<sqlx::PgPool>) -> HttpResponse {
     }
 }
 
+// Simple process health check - no database dependency
+async fn process_health_check() -> HttpResponse {
+    HttpResponse::Ok().json(serde_json::json!({
+        "status": "process_healthy",
+        "message": "Backend process is running",
+        "timestamp": chrono::Utc::now().to_rfc3339()
+    }))
+}
+
 // Legacy login endpoint (will be used when ADMIN_REALM_ENFORCED=false)
 async fn legacy_login(req: web::Json<LoginRequest>) -> Result<HttpResponse, actix_web::Error> {
     let username = req.username.clone();
@@ -129,6 +138,8 @@ async fn main() -> std::io::Result<()> {
     let port = config.port;
     
     println!("🌐 Starting HTTP server on {}:{}...", host, port);
+    println!("🔍 Debug: Host = '{}', Port = {}", host, port);
+    println!("🔍 Debug: Config host = '{}', Config port = {}", config.host, config.port);
     
     // Create HTTP server
     let server = HttpServer::new(move || {
@@ -156,7 +167,8 @@ async fn main() -> std::io::Result<()> {
             
             // Health check endpoints (no auth required) - START IMMEDIATELY
             .route("/health", web::get().to(health_check))
-            .route("/health/readiness", web::get().to(readiness_check));
+            .route("/health/readiness", web::get().to(readiness_check))
+            .route("/health/process", web::get().to(process_health_check));
         
         // Legacy API v1 routes (existing user auth)
         app = app.service(
