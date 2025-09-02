@@ -14,10 +14,11 @@ services:
       - viworks-internal
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "nginx", "-t"]
+      test: ["CMD-SHELL", "nginx -t && curl -f http://localhost:80/ || exit 1"]
       interval: 30s
-      timeout: 10s
-      retries: 3
+      timeout: 15s
+      retries: 10
+      start_period: 60s
     logging:
       driver: "json-file"
       options:
@@ -98,7 +99,7 @@ services:
   # Frontend Next.js App (Internal Network Only)
   frontend:
     build:
-      context: ./frontend
+      context: ./viworks-frontend
       dockerfile: Dockerfile
     container_name: viworks-frontend
     env_file:
@@ -110,11 +111,11 @@ services:
       - viworks-internal
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/ || exit 1"]
       interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
+      timeout: 15s
+      retries: 15
+      start_period: 120s
 
   # Website (Internal Network Only)
   website:
@@ -128,11 +129,11 @@ services:
       - viworks-internal
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/ || exit 1"]
       interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
+      timeout: 15s
+      retries: 15
+      start_period: 120s
 
   # ViWorks Agent (Internal Network Only)
   agent:
