@@ -104,6 +104,7 @@ services:
     container_name: viworks-frontend
     env_file:
       - ./env.frontend
+      - ./frontend/admin-auth.env
     depends_on:
       - backend
     networks:
