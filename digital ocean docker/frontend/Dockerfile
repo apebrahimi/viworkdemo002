@@ -4,6 +4,9 @@ FROM node:22-alpine AS builder
 # Set working directory
 WORKDIR /app
 
+# Install build dependencies
+RUN apk add --no-cache python3 make g++
+
 # Copy package files
 COPY package*.json ./
 
@@ -13,8 +16,13 @@ RUN npm install
 # Copy source code
 COPY . .
 
-# Build the application
-RUN npm run build
+# Build the application with debugging
+RUN echo "Starting build process..." && \
+    npm run build && \
+    echo "Build completed. Checking standalone output..." && \
+    ls -la .next/ && \
+    ls -la .next/standalone/ || echo "Standalone directory not found!" && \
+    echo "Build verification complete."
 
 # Production stage
 FROM node:22-alpine AS runner

@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",
+    "postbuild": "echo 'Build completed. Verifying standalone output...' && ls -la .next/ && ls -la .next/standalone/ || echo 'WARNING: Standalone directory not found!'",
     "start": "next start",
     "lint": "eslint"
   },
