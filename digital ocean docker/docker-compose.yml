@@ -23,6 +23,10 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+    depends_on:
+      - backend
+      - frontend
+      - website
 
   # PostgreSQL Database (Internal Network Only)
   postgres:
@@ -42,6 +46,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 30s
     restart: unless-stopped
 
   # Redis Cache (Internal Network Only)
@@ -57,6 +62,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
     restart: unless-stopped
 
   # Backend API Server (Internal Network Only)
@@ -98,7 +104,8 @@ services:
     env_file:
       - ./env.production
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     networks:
       - viworks-internal
     restart: unless-stopped
@@ -107,6 +114,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 30s
 
   # Website (Internal Network Only)
   website:
@@ -124,6 +132,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 30s
 
   # ViWorks Agent (Internal Network Only)
   agent:
@@ -144,6 +153,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 30s
 
 volumes:
   postgres_data:
