@@ -121,14 +121,29 @@ async fn main() -> std::io::Result<()> {
         .expect("Failed to run migrations");
     println!("✅ Migrations completed");
     
-    // Check and initialize feature flags
-    let admin_realm_enabled = sqlx::query_scalar::<_, bool>(
+    // Check and initialize feature flags (handle case where table doesn't exist yet)
+    let admin_realm_enabled = match sqlx::query_scalar::<_, bool>(
         "SELECT enabled FROM feature_flags WHERE name = 'ADMIN_REALM_ENFORCED'"
     )
     .fetch_optional(&pool)
-    .await
-    .unwrap_or(Some(false))
-    .unwrap_or(false);
+    .await {
+        Ok(Some(enabled)) => enabled,
+        Ok(None) => {
+            // Table exists but no flag set, create it
+            println!("📋 Creating admin realm feature flag...");
+            let _ = sqlx::query(
+                "INSERT INTO feature_flags (name, enabled, description) VALUES ('ADMIN_REALM_ENFORCED', false, 'Enable separated admin authentication realm') ON CONFLICT (name) DO NOTHING"
+            )
+            .execute(&pool)
+            .await;
+            false
+        },
+        Err(_) => {
+            // Table doesn't exist yet, use environment variable
+            println!("⚠️  Feature flags table not found, using environment variable");
+            false
+        }
+    };
     
     // Override with environment variable if set
     let admin_realm_enforced = env::var("ADMIN_REALM_ENFORCED")
