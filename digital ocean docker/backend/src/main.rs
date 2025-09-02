@@ -30,6 +30,14 @@ async fn health_check_simple() -> HttpResponse {
     }))
 }
 
+async fn readiness_check() -> HttpResponse {
+    HttpResponse::Ok().json(serde_json::json!({
+        "status": "ready",
+        "message": "Backend is ready to serve requests",
+        "timestamp": chrono::Utc::now().to_rfc3339()
+    }))
+}
+
 async fn login(req: web::Json<LoginRequest>) -> Result<HttpResponse, actix_web::Error> {
     let username = req.username.clone();
     let _password = req.password.clone();
@@ -207,6 +215,7 @@ async fn main() -> std::io::Result<()> {
             // Health check endpoints
             .route("/health", web::get().to(health_check))
             .route("/health/simple", web::get().to(health_check_simple))
+            .route("/health/readiness", web::get().to(readiness_check))
             
             // API v1 routes
             .service(

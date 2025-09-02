@@ -84,11 +84,11 @@ services:
       - viworks-internal
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
-      interval: 30s
-      timeout: 15s
-      retries: 5
-      start_period: 60s
+      test: ["CMD-SHELL", "curl -f http://localhost:8081/health/readiness || exit 1"]
+      interval: 45s
+      timeout: 20s
+      retries: 15
+      start_period: 180s
     logging:
       driver: "json-file"
       options:
