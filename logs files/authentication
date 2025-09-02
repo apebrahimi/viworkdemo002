@@ -1,0 +1,201 @@
+Got it. Below is a clean, implementation-ready plan to separate admin authentication from end-user authentication without introducing MFA right now, while keeping a clear upgrade path for later. I’ll avoid concrete code/SQL so we don’t collide with what you already have, and I’ll keep all changes additive and reversible.
+
+⸻
+
+ViWorkS — Admin/Auth Realm Separation (No-MFA v1)
+
+Goal: End-users (who consume tunnels) must never be able to access the Admin Panel. We introduce a separate identity store, tokens, routes, cookies, and middleware for admins, enforce network scoping (local only), and keep a clean path to add MFA/SSO later.
+
+⸻
+
+1) Why we need separation (executive rationale)
+	•	Least privilege & blast radius: User accounts (for tunnel access) should not be able to perform admin tasks (create users, rotate keys, terminate sessions, spawn containers). Shared auth violates least privilege and inflates risk.
+	•	Clear trust boundaries & audit: Admin actions must be independently authenticated, authorized, audited, and revocable. Mixing realms makes forensics and compliance (ISO 27001, SOC 2) weak.
+	•	Operational stability: End-user auth changes shouldn’t break the admin panel and vice versa. Independent control planes reduce coupling and outages.
+	•	Defense-in-depth: Even though the admin panel will be local-only, account separation plus IP allowlisting and short sessions is a strong baseline before adding MFA/SSO later.
+
+⸻
+
+2) Scope & non-goals
+	•	In scope (now):
+Separate admin realm (identity store, routes, tokens, cookies), local-network binding, IP allowlist, RBAC roles, audit logs, short session TTL, feature flag, rollback path.
+	•	Out of scope (later):
+MFA/TOTP/SSO, hardware keys, PAM/LDAP integration. (We’ll keep hooks to add them cleanly.)
+
+⸻
+
+3) Architecture overview (what we add, not what we rewrite)
+	•	Separate identity store: Admin Accounts live in a different logical space than End-Users. No record overlap.
+	•	Separate APIs & routes:
+	•	Admin APIs under /admin/api/... (only for Admin Panel).
+	•	User APIs remain at current /api/... paths.
+	•	Separate tokens & cookies:
+	•	Admin tokens use different signing key, issuer, audience, and cookie name than user tokens.
+	•	Admin cookies set HttpOnly + Secure + SameSite=Strict; no localStorage usage.
+	•	Separate middleware/guards:
+	•	Admin routes require AdminAuthGuard (validates admin token claims & RBAC).
+	•	User routes keep existing guards; reject admin tokens there (and vice versa).
+	•	Network containment:
+	•	Admin backend binds to the LAN interface (or behind reverse proxy restricted to RFC1918).
+	•	IP allowlist (CIDRs of your office/VPN/jump box).
+	•	RBAC roles (minimal): ADMIN (full), OPERATOR (ops CRUD, no policy relax), AUDITOR (read-only).
+	•	Audit trail: Every admin login and privileged action writes structured audit events (who, what, when, where).
+	•	Feature flag: ADMIN_REALM_ENFORCED=true|false to cut over safely.
+	•	Rollback: Disable the flag to fall back without deleting new code.
+
+⸻
+
+4) Minimal change plan (phased, additive, low risk)
+
+Phase A — Prepare (no behavior change)
+	1.	Create admin realm scaffolding
+	•	Admin identities (separate table/collection or tenant namespace).
+	•	Admin session store (if you use server sessions) or keep JWT-only but with distinct signer/claims.
+	•	Seed a break-glass admin (strong password in a sealed secret; rotate after validation).
+	2.	Introduce admin tokens & cookies
+	•	Admin token uses different ISS/AUD, different signing key, short TTL (e.g., 10–15 min), and idle timeout.
+	•	Cookie name dedicated to admin (e.g., viw_admin_sess).
+	3.	Stand up admin API namespace
+	•	Mirror existing admin-type endpoints under /admin/api/... (but keep old ones intact for now).
+	•	Add an admin health endpoint to validate deployment.
+	4.	Bind admin API to local network
+	•	Listen on LAN IP or behind reverse proxy that only accepts RFC1918/VPN CIDRs.
+	•	Add an IP allowlist check (CIDR-based).
+	5.	Introduce AdminAuthGuard
+	•	Validates admin token only, enforces RBAC, rejects user tokens.
+	•	For now, no TOTP; enforce strong passwords (length, entropy) and lockout after N failed attempts.
+
+At this point nothing is “enforced” yet. You can hit the new /admin/api/_health and try login in a sandbox, without touching user flows.
+
+⸻
+
+Phase B — Cutover (behind a feature flag)
+	6.	Move Admin Panel frontend under /admin/*
+	•	New admin login page (email/password).
+	•	Admin session handled via admin cookie; ensure no shared auth context with user UI.
+	•	Wrap admin pages behind an Admin-only route guard that calls /admin/api/auth/me.
+	7.	Wire Admin Panel to /admin/api/*
+	•	Point all admin UI calls to the new admin API namespace.
+	•	Keep the legacy admin endpoints online temporarily (not used by UI).
+	8.	Enable ADMIN_REALM_ENFORCED=true (staging first)
+	•	All /admin/api/* require AdminAuthGuard + IP allowlist.
+	•	All non-admin APIs refuse admin tokens; all admin APIs refuse user tokens.
+	9.	Smoke tests & accept
+	•	Confirm: end-user login/tunnel flow works unchanged; admin panel is only reachable on LAN and with admin creds.
+	•	Confirm: admin tokens do not unlock user endpoints; user tokens do not unlock admin endpoints.
+
+⸻
+
+Phase C — Harden & clean
+	10.	Shorten admin session & add inactivity timeout
+	•	Idle logout ~15 minutes (configurable), absolute session lifetime (e.g., 8h).
+	11.	Add security headers to Admin Panel
+	•	Strict CSP (self + needed origins), X-Frame-Options DENY, Referrer-Policy strict, etc.
+	12.	Finalize audit events
+	•	Log who/what/when/where for login, user CRUD, policy changes, session termination, gateway ops.
+	13.	(Optional) retire legacy admin routes
+	•	After validation, remove or 403 old admin endpoints.
+	14.	Document upgrade path (MFA/SSO later)
+	•	Keep interface to plug TOTP/FIDO2/OIDC later without refactors.
+
+⸻
+
+5) Compensating controls (since no MFA in v1)
+
+Until you add MFA, apply these low-friction safeguards:
+	•	Network restriction: Admin API/Panel accessible only from allowlisted LAN/VPN CIDRs.
+	•	Strong passwords & lockout: Minimum length + complexity; lock after N failures; cooldown.
+	•	Short sessions: Admin tokens short TTL, cookie lifetime short; enforce idle logout.
+	•	Device hygiene: Restrict access to a jump host or bastion with OS MFA (if available) and logging.
+	•	Audit & alerts: Alert on repeated failed logins, off-hours admin logins, and privilege changes.
+
+⸻
+
+6) Interfaces & boundaries (what must be distinct)
+	•	Admin API surface: /admin/api/... only (never share any route prefix with user APIs).
+	•	Admin cookie name: unique, HttpOnly, Secure, SameSite=Strict.
+	•	Admin token claims: distinct iss, aud, and key from user tokens.
+	•	Admin roles: enforce at route layer and within handlers (defense in depth).
+	•	Frontend state: Admin Panel has separate auth context, never reads user cookies or tokens.
+	•	CORS & CSRF: Lock CORS to admin origin only; use a CSRF token for state-changing admin requests.
+	•	Binding & firewall: Admin API binds to internal interface or sits behind reverse proxy with IP allowlist.
+
+⸻
+
+7) Observability & audit (what to log)
+	•	Admin login events: success/failure, IP, user agent.
+	•	Privilege use: who performed which action (user create/delete, policy change, gateway command).
+	•	Security posture: failed login spikes, off-hours admin access, role changes.
+	•	Correlation IDs: attach req_id to every admin call; show it in UI error banners for support.
+	•	Storage: forward to your future SIEM; until then, store locally with rotation and integrity checks.
+
+⸻
+
+8) Testing & acceptance (no surprises)
+
+Functional
+	•	End-user flow (desktop + mobile OTP + tunnel) unchanged.
+	•	Admin can log in on LAN only; all admin pages work using /admin/api/*.
+	•	RBAC: ADMIN vs OPERATOR vs AUDITOR route access behaves as designed.
+
+Negative
+	•	User token against /admin/api/* → 403.
+	•	Admin token against user routes → 401/403.
+	•	Non-allowlisted IP → blocked.
+	•	Idle for >15 min → admin session expired.
+	•	Repeated bad passwords → lockout triggers.
+
+Security checks
+	•	Admin cookies are HttpOnly, Secure, SameSite=Strict; not visible to JS.
+	•	No auth state in localStorage/sessionStorage.
+	•	CSP on admin pages blocks inline scripts and unknown origins.
+
+⸻
+
+9) Rollout & rollback
+	•	Staging first, with ADMIN_REALM_ENFORCED=false: verify new admin auth end-to-end.
+	•	Flip to true in staging → test negative cases.
+	•	Prod rollout window with monitoring & console access:
+	•	Flip flag to true.
+	•	If anything breaks, flip back to false. No data migrations are reversed.
+	•	After a week stable, disable legacy admin routes (return 404/403) and keep the feature flag for emergency.
+
+⸻
+
+10) Future (MFA/SSO ready)
+
+When you’re ready:
+	•	Add TOTP or FIDO2 to admin login with a step-up screen (no routing changes).
+	•	Or integrate OIDC/SAML for Enterprise SSO (map IdP groups → RBAC roles).
+	•	Optionally use client TLS (mTLS) for admin panel inside LAN/VPN for device binding.
+
+⸻
+
+11) Common pitfalls to avoid (learned from your issues)
+	•	Do not rename or move user API routes during this work. Only add /admin/api/*.
+	•	Do not share token verifiers: keep separate signing keys and claim validation paths.
+	•	Do not reuse frontend auth context/hooks between user and admin; create a new, minimal admin auth context.
+	•	Do not store admin tokens in localStorage; use an HttpOnly cookie.
+	•	Do not expose admin API publicly; bind to LAN or put behind a reverse proxy with CIDR allowlist.
+
+⸻
+
+12) What to tell Cursor (summary brief you can paste)
+
+Objective: Separate admin authentication from end-user authentication without MFA (for now). Add a new admin realm that is network-restricted (LAN/VPN only) and fully isolated from user auth. All changes must be additive and protected by a feature flag.
+
+Deliverables (in order):
+	1.	Add an admin identity store and session/token logic distinct from end-users.
+	2.	Create admin APIs under /admin/api/* (auth, users, policies, sessions, system), guarded by AdminAuthGuard that only accepts admin tokens and enforces RBAC.
+	3.	Bind admin API to LAN and enforce IP allowlist.
+	4.	Move Admin Panel UI to /admin/*, add a separate admin auth context and admin login page.
+	5.	Set admin cookies to HttpOnly/Secure/SameSite=Strict; no localStorage.
+	6.	Add audit logging for admin logins and privileged actions.
+	7.	Introduce ADMIN_REALM_ENFORCED feature flag; cut over on staging, then prod.
+	8.	Keep all user flows unchanged; admin tokens rejected on user routes, and user tokens rejected on admin routes.
+
+Constraints: Do not modify existing user APIs/routes or token logic; only add the admin realm. Avoid code/DB changes that break current flows. Keep the change set minimal and reversible.
+
+⸻
+
+This plan keeps your platform stable, delivers the critical separation cleanly, and gives you a secure baseline (network-restricted admin, short sessions, RBAC, audit) with a low-risk path to MFA/SSO later.
