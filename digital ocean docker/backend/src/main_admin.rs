@@ -4,6 +4,7 @@ use actix_cors::Cors;
 use sqlx::postgres::PgPoolOptions;
 use std::env;
 use serde::{Deserialize, Serialize};
+use tokio::time;
 
 // Import modules
 mod config;
@@ -39,11 +40,21 @@ async fn health_check() -> HttpResponse {
 }
 
 async fn readiness_check(pool: web::Data<sqlx::PgPool>) -> HttpResponse {
-    // Check database connection
-    let db_healthy = sqlx::query("SELECT 1")
-        .fetch_one(pool.get_ref())
-        .await
-        .is_ok();
+    // Check database connection with timeout and error handling
+    let db_healthy = match time::timeout(
+        std::time::Duration::from_secs(3),
+        sqlx::query("SELECT 1").fetch_one(pool.get_ref()).await
+    ).await {
+        Ok(Ok(_)) => true,
+        Ok(Err(e)) => {
+            eprintln!("Database query failed: {}", e);
+            false
+        },
+        Err(_) => {
+            eprintln!("Database connection timeout");
+            false
+        }
+    };
 
     if db_healthy {
         HttpResponse::Ok().json(serde_json::json!({
@@ -55,7 +66,7 @@ async fn readiness_check(pool: web::Data<sqlx::PgPool>) -> HttpResponse {
     } else {
         HttpResponse::ServiceUnavailable().json(serde_json::json!({
             "status": "not_ready",
-            "message": "Database connection failed",
+            "message": "Database connection failed or timeout",
             "database": "disconnected",
             "timestamp": chrono::Utc::now().to_rfc3339()
         }))
@@ -113,63 +124,13 @@ async fn main() -> std::io::Result<()> {
     
     println!("✅ Database connected");
     
-    // Run migrations
-    println!("🔄 Running database migrations...");
-    sqlx::migrate!("./migrations")
-        .run(&pool)
-        .await
-        .expect("Failed to run migrations");
-    println!("✅ Migrations completed");
-    
-    // Check and initialize feature flags (handle case where table doesn't exist yet)
-    let admin_realm_enabled = match sqlx::query_scalar::<_, bool>(
-        "SELECT enabled FROM feature_flags WHERE name = 'ADMIN_REALM_ENFORCED'"
-    )
-    .fetch_optional(&pool)
-    .await {
-        Ok(Some(enabled)) => enabled,
-        Ok(None) => {
-            // Table exists but no flag set, create it
-            println!("📋 Creating admin realm feature flag...");
-            let _ = sqlx::query(
-                "INSERT INTO feature_flags (name, enabled, description) VALUES ('ADMIN_REALM_ENFORCED', false, 'Enable separated admin authentication realm') ON CONFLICT (name) DO NOTHING"
-            )
-            .execute(&pool)
-            .await;
-            false
-        },
-        Err(_) => {
-            // Table doesn't exist yet, use environment variable
-            println!("⚠️  Feature flags table not found, using environment variable");
-            false
-        }
-    };
-    
-    // Override with environment variable if set
-    let admin_realm_enforced = env::var("ADMIN_REALM_ENFORCED")
-        .unwrap_or_else(|_| admin_realm_enabled.to_string()) == "true";
-    
-    if admin_realm_enforced {
-        println!("🔐 Admin realm separation is ENABLED");
-    } else {
-        println!("⚠️  Admin realm separation is DISABLED (using legacy auth)");
-    }
-    
-    // Get IP allowlist from environment
-    let admin_ip_allowlist: Vec<String> = env::var("ADMIN_IP_ALLOWLIST")
-        .unwrap_or_else(|_| "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,127.0.0.1/32".to_string())
-        .split(',')
-        .map(|s| s.trim().to_string())
-        .collect();
-    
-    println!("🌐 Admin IP allowlist: {:?}", admin_ip_allowlist);
-    
+    // Start HTTP server FIRST (so health checks work)
     let host = config.host.clone();
     let port = config.port;
     
-    // Create HTTP server
     println!("🌐 Starting HTTP server on {}:{}...", host, port);
     
+    // Create HTTP server
     let server = HttpServer::new(move || {
         // Configure CORS
         let cors = Cors::default()
@@ -193,14 +154,9 @@ async fn main() -> std::io::Result<()> {
             .wrap(middleware::Logger::default())
             .wrap(middleware::NormalizePath::trim())
             
-            // Health check endpoints (no auth required)
+            // Health check endpoints (no auth required) - START IMMEDIATELY
             .route("/health", web::get().to(health_check))
             .route("/health/readiness", web::get().to(readiness_check));
-        
-        // Configure admin routes if admin realm is enforced
-        if admin_realm_enforced {
-            app = app.configure(admin::configure_admin_routes);
-        }
         
         // Legacy API v1 routes (existing user auth)
         app = app.service(
@@ -221,6 +177,60 @@ async fn main() -> std::io::Result<()> {
     println!("📊 Admin panel: http://{}:{}/admin", config.host, port);
     println!("🔒 Admin API: http://{}:{}/admin/api", config.host, port);
     
+    // Run migrations in background AFTER server starts
+    let pool_clone = pool.clone();
+    tokio::spawn(async move {
+        println!("🔄 Running database migrations in background...");
+        match sqlx::migrate!("./migrations").run(&pool_clone).await {
+            Ok(_) => println!("✅ Migrations completed successfully"),
+            Err(e) => eprintln!("❌ Migration failed: {}", e),
+        }
+        
+        // Check and initialize feature flags
+        println!("📋 Checking feature flags...");
+        let admin_realm_enabled = match sqlx::query_scalar::<_, bool>(
+            "SELECT enabled FROM feature_flags WHERE name = 'ADMIN_REALM_ENFORCED'"
+        )
+        .fetch_optional(&pool_clone)
+        .await {
+            Ok(Some(enabled)) => enabled,
+            Ok(None) => {
+                // Table exists but no flag set, create it
+                println!("📋 Creating admin realm feature flag...");
+                let _ = sqlx::query(
+                    "INSERT INTO feature_flags (name, enabled, description) VALUES ('ADMIN_REALM_ENFORCED', false, 'Enable separated admin authentication realm') ON CONFLICT (name) DO NOTHING"
+                )
+                .execute(&pool_clone)
+                .await;
+                false
+            },
+            Err(_) => {
+                // Table doesn't exist yet, use environment variable
+                println!("⚠️  Feature flags table not found, using environment variable");
+                false
+            }
+        };
+        
+        // Override with environment variable if set
+        let admin_realm_enforced = env::var("ADMIN_REALM_ENFORCED")
+            .unwrap_or_else(|_| admin_realm_enabled.to_string()) == "true";
+        
+        if admin_realm_enforced {
+            println!("🔐 Admin realm separation is ENABLED");
+        } else {
+            println!("⚠️  Admin realm separation is DISABLED (using legacy auth)");
+        }
+        
+        // Get IP allowlist from environment
+        let admin_ip_allowlist: Vec<String> = env::var("ADMIN_IP_ALLOWLIST")
+            .unwrap_or_else(|_| "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,127.0.0.1/32".to_string())
+            .split(',')
+            .map(|s| s.trim().to_string())
+            .collect();
+        
+        println!("🌐 Admin IP allowlist: {:?}", admin_ip_allowlist);
+    });
+    
     // Run server
     match server.run().await {
         Ok(_) => {
@@ -232,4 +242,6 @@ async fn main() -> std::io::Result<()> {
             Err(std::io::Error::new(std::io::ErrorKind::Other, e))
         }
     }
+    
+
 }
