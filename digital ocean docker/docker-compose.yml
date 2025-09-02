@@ -99,7 +99,7 @@ services:
   # Frontend Next.js App (Internal Network Only)
   frontend:
     build:
-      context: ./viworks-frontend
+      context: ./frontend
       dockerfile: Dockerfile
     container_name: viworks-frontend
     env_file:
