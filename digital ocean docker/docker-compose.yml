@@ -85,11 +85,11 @@ services:
       - viworks-internal
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8081/health/readiness | head -1 || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8081/health | head -1 || exit 1"]
       interval: 30s
       timeout: 15s
       retries: 5
-      start_period: 60s
+      start_period: 120s
     logging:
       driver: "json-file"
       options:
@@ -105,8 +105,7 @@ services:
     env_file:
       - ./env.production
     depends_on:
-      backend:
-        condition: service_healthy
+      - backend
     networks:
       - viworks-internal
     restart: unless-stopped
