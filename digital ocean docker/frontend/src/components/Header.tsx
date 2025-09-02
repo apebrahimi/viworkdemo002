@@ -176,7 +176,7 @@ export function Header({ onSidebarToggle }: HeaderProps) {
               className={`flex ${isRTL ? 'flex-row-reverse' : 'flex-row'} items-center space-x-2 ${isRTL ? 'space-x-reverse' : ''} p-2 rounded-lg hover:bg-white/10 dark:hover:bg-white/10 light:hover:bg-black/10 transition-colors`}
             >
               <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-                <span className="text-white text-sm font-medium">{user?.username?.charAt(0).toUpperCase() || 'A'}</span>
+                <span className="text-white text-sm font-medium">{username?.charAt(0).toUpperCase() || 'A'}</span>
               </div>
               <div className="hidden md:block text-right">
                 <p className="text-sm font-medium">{username || (language === 'fa' ? 'مدیر سیستم' : 'System Admin')}</p>

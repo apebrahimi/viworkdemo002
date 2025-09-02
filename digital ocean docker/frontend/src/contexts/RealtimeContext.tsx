@@ -51,8 +51,13 @@ export const RealtimeProvider: React.FC<RealtimeProviderProps> = ({ children }) 
     disconnect
   } = useWebSocket(wsUrl);
 
-  // Auto-connect when authenticated and URL is ready
+  // TEMPORARILY DISABLED: Auto-connect when authenticated and URL is ready
+  // This is causing the admin panel to fail loading
   useEffect(() => {
+    // Disable WebSocket for now to fix admin panel loading
+    console.log('WebSocket temporarily disabled to fix admin panel loading');
+    return;
+    
     if (isAuthenticated && wsUrl && wsUrl.trim() !== '') {
       console.log('Attempting to connect to WebSocket:', wsUrl);
       connect();
@@ -64,8 +69,12 @@ export const RealtimeProvider: React.FC<RealtimeProviderProps> = ({ children }) 
     }
   }, [isAuthenticated, wsUrl, connect, disconnect, isConnected]);
 
-  // Auto-subscribe to channels when connected
+  // TEMPORARILY DISABLED: Auto-subscribe to channels when connected
   useEffect(() => {
+    // Disable WebSocket subscriptions for now
+    console.log('WebSocket subscriptions temporarily disabled');
+    return;
+    
     if (isConnected && isAuthenticated) {
       console.log('Subscribing to default channels');
       // Subscribe to default channels
