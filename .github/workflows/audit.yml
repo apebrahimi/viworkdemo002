@@ -1,4 +1,5 @@
 name: Project Audit
+# Updated audit workflow - no pnpm dependency
 on:
   push:
   pull_request:

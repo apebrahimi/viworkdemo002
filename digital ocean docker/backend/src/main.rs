@@ -721,7 +721,7 @@ async fn main() -> std::io::Result<()> {
     
     // Retry database connection with exponential backoff
     let mut retry_count = 0;
-    let max_retries = 5;
+    let max_retries = 10; // Increased retries for better resilience
     let pool = loop {
         match PgPool::connect(&database_url).await {
             Ok(pool) => {
@@ -734,6 +734,7 @@ async fn main() -> std::io::Result<()> {
                     log::error!("❌ Failed to connect to database after {} attempts: {}", max_retries, e);
                     log::error!("🔍 Database URL: {}", database_url);
                     log::error!("🌐 Network check: Make sure PostgreSQL is accessible from this container");
+                    log::error!("💡 Check if PostgreSQL container is running and healthy");
                     std::process::exit(1);
                 }
                 let delay = std::time::Duration::from_secs(2u64.pow(retry_count as u32));
@@ -744,10 +745,20 @@ async fn main() -> std::io::Result<()> {
         }
     };
     
+    // Test database connection
+    match pool.acquire().await {
+        Ok(_) => log::info!("✅ Database connection test successful"),
+        Err(e) => {
+            log::error!("❌ Database connection test failed: {}", e);
+            std::process::exit(1);
+        }
+    }
+    
     log::info!("✅ Database connected successfully");
     log::info!("🌐 Starting HTTP server on 0.0.0.0:8081...");
     
-    HttpServer::new(move || {
+    // Create server with graceful shutdown and better error handling
+    let server = HttpServer::new(move || {
         let cors = Cors::default()
             .allow_any_origin()
             .allow_any_method()
@@ -789,7 +800,21 @@ async fn main() -> std::io::Result<()> {
                     .route("/admin/device/approve", web::post().to(approve_device))
             )
     })
-    .bind("0.0.0.0:8081")?
-    .run()
-    .await
+    .shutdown_timeout(30) // Graceful shutdown timeout
+    .bind("0.0.0.0:8081")?;
+    
+    log::info!("✅ HTTP server bound successfully");
+    log::info!("🚀 Server is now running and accepting connections");
+    
+    // Run server with better error handling
+    match server.run().await {
+        Ok(_) => {
+            log::info!("✅ Server shutdown gracefully");
+            Ok(())
+        }
+        Err(e) => {
+            log::error!("❌ Server error: {}", e);
+            Err(std::io::Error::new(std::io::ErrorKind::Other, e))
+        }
+    }
 }
