@@ -1,5 +1,6 @@
 use actix_web::{App, HttpServer, web, HttpResponse};
 use serde::{Deserialize, Serialize};
+use std::io;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct LoginRequest {
@@ -196,7 +197,7 @@ async fn approve_device(_req: web::Json<serde_json::Value>) -> HttpResponse {
 }
 
 #[actix_web::main]
-async fn main() -> std::io::Result<()> {
+async fn main() -> io::Result<()> {
     // Initialize basic logging immediately
     env_logger::init();
     println!("🚀 Starting ViWorkS Admin Backend (Minimal)...");
@@ -206,10 +207,24 @@ async fn main() -> std::io::Result<()> {
     println!("  HOST: {}", std::env::var("HOST").unwrap_or_else(|_| "0.0.0.0".to_string()));
     println!("  PORT: {}", std::env::var("PORT").unwrap_or_else(|_| "8081".to_string()));
     println!("  RUST_LOG: {}", std::env::var("RUST_LOG").unwrap_or_else(|_| "info".to_string()));
+    println!("  DATABASE_URL: {}", std::env::var("DATABASE_URL").unwrap_or_else(|_| "not set".to_string()));
+    println!("  REDIS_URL: {}", std::env::var("REDIS_URL").unwrap_or_else(|_| "not set".to_string()));
     
-    println!("🌐 Starting HTTP server on 0.0.0.0:8081...");
+    // Parse port with error handling
+    let port = std::env::var("PORT")
+        .unwrap_or_else(|_| "8081".to_string())
+        .parse::<u16>()
+        .map_err(|e| {
+            eprintln!("❌ Invalid PORT environment variable: {}", e);
+            io::Error::new(io::ErrorKind::InvalidInput, format!("Invalid PORT: {}", e))
+        })?;
     
-    // Create server with graceful shutdown
+    let host = std::env::var("HOST").unwrap_or_else(|_| "0.0.0.0".to_string());
+    let bind_addr = format!("{}:{}", host, port);
+    
+    println!("🌐 Starting HTTP server on {}...", bind_addr);
+    
+    // Create server with graceful shutdown and better error handling
     let server = HttpServer::new(|| {
         App::new()
             // Health check endpoints
@@ -242,12 +257,17 @@ async fn main() -> std::io::Result<()> {
             )
     })
     .shutdown_timeout(30) // Graceful shutdown timeout
-    .bind("0.0.0.0:8081")?;
+    .bind(&bind_addr)
+    .map_err(|e| {
+        eprintln!("❌ Failed to bind server to {}: {}", bind_addr, e);
+        io::Error::new(io::ErrorKind::AddrNotAvailable, format!("Bind failed: {}", e))
+    })?;
     
-    println!("✅ HTTP server bound successfully");
+    println!("✅ HTTP server bound successfully to {}", bind_addr);
     println!("🚀 Server is now running and accepting connections");
+    println!("🔍 Health check available at: http://{}/health", bind_addr);
     
-    // Run server with better error handling
+    // Run server with comprehensive error handling
     match server.run().await {
         Ok(_) => {
             println!("✅ Server shutdown gracefully");
@@ -255,7 +275,7 @@ async fn main() -> std::io::Result<()> {
         }
         Err(e) => {
             eprintln!("❌ Server error: {}", e);
-            Err(std::io::Error::new(std::io::ErrorKind::Other, e))
+            Err(io::Error::new(io::ErrorKind::Other, e))
         }
     }
 }
