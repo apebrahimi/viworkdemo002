@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAdminAuth } from '@/contexts/AdminAuthContext';
 import { t } from '@/lib/translations';
 import { LanguageSwitcher } from './LanguageSwitcher';
 
@@ -29,7 +29,7 @@ interface HeaderProps {
 export function Header({ onSidebarToggle }: HeaderProps) {
   const { language, isRTL } = useLanguage();
   const { theme, toggleTheme } = useTheme();
-  const { user, logout } = useAuth();
+  const { username, logout } = useAdminAuth();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
@@ -179,8 +179,8 @@ export function Header({ onSidebarToggle }: HeaderProps) {
                 <span className="text-white text-sm font-medium">{user?.username?.charAt(0).toUpperCase() || 'A'}</span>
               </div>
               <div className="hidden md:block text-right">
-                <p className="text-sm font-medium">{user?.username || (language === 'fa' ? 'مدیر سیستم' : 'System Admin')}</p>
-                <p className="text-xs text-muted-foreground">{user?.email || 'admin@viworks.com'}</p>
+                <p className="text-sm font-medium">{username || (language === 'fa' ? 'مدیر سیستم' : 'System Admin')}</p>
+                <p className="text-xs text-muted-foreground">admin@viworks.com</p>
               </div>
               <ChevronDown className={`w-4 h-4 transition-transform ${isProfileOpen ? 'rotate-180' : ''}`} />
             </button>
@@ -191,11 +191,11 @@ export function Header({ onSidebarToggle }: HeaderProps) {
                 <div className="p-4 border-b border-white/10 dark:border-white/10 light:border-black/10">
                   <div className="flex items-center space-x-3">
                     <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-                      <span className="text-white font-medium">{user?.username?.charAt(0).toUpperCase() || 'A'}</span>
+                      <span className="text-white font-medium">{username?.charAt(0).toUpperCase() || 'A'}</span>
                     </div>
                     <div>
-                      <p className="font-medium">{user?.username || (language === 'fa' ? 'مدیر سیستم' : 'System Admin')}</p>
-                      <p className="text-sm text-muted-foreground">{user?.email || 'admin@viworks.com'}</p>
+                      <p className="font-medium">{username || (language === 'fa' ? 'مدیر سیستم' : 'System Admin')}</p>
+                      <p className="text-sm text-muted-foreground">admin@viworks.com</p>
                     </div>
                   </div>
                 </div>

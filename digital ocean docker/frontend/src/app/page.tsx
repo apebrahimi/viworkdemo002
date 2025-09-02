@@ -16,7 +16,7 @@ import { SettingsSection } from '@/components/sections/SettingsSection';
 import { Sidebar } from '@/components/Sidebar';
 import { Header } from '@/components/Header';
 import { ClientOnly } from '@/components/ClientOnly';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAdminAuth } from '@/contexts/AdminAuthContext';
 
 type Section = 
   | 'dashboard' 
@@ -33,7 +33,7 @@ type Section =
 export default function AdminPanel() {
   const [activeSection, setActiveSection] = useState<Section>('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading } = useAdminAuth();
   const router = useRouter();
 
   // Redirect to login if not authenticated

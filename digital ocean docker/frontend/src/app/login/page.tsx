@@ -6,7 +6,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Eye, EyeOff, Shield, AlertCircle, CheckCircle } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAdminAuth } from '@/contexts/AdminAuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { t } from '@/lib/translations';
 
@@ -21,7 +21,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const { login, isLoading } = useAuth();
+  const { login, isLoading } = useAdminAuth();
   const { language } = useLanguage();
   const router = useRouter();
 
@@ -37,7 +37,7 @@ export default function LoginPage() {
     try {
       setError(null);
       setSuccess(null);
-      await login(data);
+      await login(data.username, data.password);
       
       // Show success message and redirect immediately
       setSuccess(t('loginSuccessful', language));

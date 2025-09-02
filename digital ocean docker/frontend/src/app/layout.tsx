@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
-import { AuthProvider } from '@/contexts/AuthContext'
+import { AdminAuthProvider } from '@/contexts/AdminAuthContext'
 import { LanguageProvider } from '@/contexts/LanguageContext'
 import { ThemeProvider } from '@/contexts/ThemeContext'
 import { RealtimeProvider } from '@/contexts/RealtimeContext'
@@ -62,14 +62,14 @@ export default function RootLayout({
         <QueryProvider>
           <LanguageProvider>
             <ThemeProvider>
-              <AuthProvider>
+              <AdminAuthProvider>
                 <RealtimeProvider>
                   <div className="h-screen bg-background text-foreground overflow-hidden">
                     {children}
                   </div>
                   <Toaster />
                 </RealtimeProvider>
-              </AuthProvider>
+              </AdminAuthProvider>
             </ThemeProvider>
           </LanguageProvider>
         </QueryProvider>
