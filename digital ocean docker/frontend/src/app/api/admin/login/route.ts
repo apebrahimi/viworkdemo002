@@ -6,10 +6,19 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { username, password } = body;
 
-    // Get credentials from environment variables
+    // Get credentials from environment variables with fallback
     const adminUsername = process.env.ADMIN_USERNAME || 'admin';
-    const adminPassword = process.env.ADMIN_PASSWORD || 'changeme';
+    const adminPassword = process.env.ADMIN_PASSWORD || 'ViWorkS@2024!';
     const sessionTTL = parseInt(process.env.ADMIN_SESSION_TTL_SECONDS || '28800', 10);
+
+    console.log('Login attempt:', { 
+      provided: { username, password: '***' }, 
+      expected: { username: adminUsername, password: '***' },
+      envLoaded: { 
+        ADMIN_USERNAME: !!process.env.ADMIN_USERNAME, 
+        ADMIN_PASSWORD: !!process.env.ADMIN_PASSWORD 
+      }
+    });
 
     // Validate credentials
     if (username !== adminUsername || password !== adminPassword) {
@@ -28,6 +37,8 @@ export async function POST(request: NextRequest) {
       path: '/',  // Available for entire admin panel
       maxAge: sessionTTL,
     });
+
+    console.log('Login successful for user:', username);
 
     return NextResponse.json({ 
       ok: true,
