@@ -15,27 +15,41 @@ impl Actor for WebSocketActor {
 
     fn started(&mut self, ctx: &mut Self::Context) {
         // Start heartbeat
-        ctx.run_interval(Duration::from_secs(30), |act, ctx| {
+        ctx.run_interval(HEARTBEAT_INTERVAL, |act, ctx| {
             if Instant::now().duration_since(act.hb) > CLIENT_TIMEOUT {
                 log::warn!("WebSocket heartbeat failed, disconnecting");
                 ctx.stop();
                 return;
             }
+            
+            // Send ping
             ctx.ping(b"");
         });
     }
 }
 
 impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WebSocketActor {
-    fn handle(&mut self, msg: Result<ws::Message, ws::ProtocolError>, ctx: &mut Self::Context) {
+    fn handle(
+        &mut self,
+        msg: Result<ws::Message, ws::ProtocolError>,
+        ctx: &mut Self::Context,
+    ) {
         match msg {
+            Ok(ws::Message::Ping(msg)) => {
+                self.hb = Instant::now();
+                ctx.pong(&msg);
+            }
+            Ok(ws::Message::Pong(_)) => {
+                self.hb = Instant::now();
+            }
             Ok(ws::Message::Text(text)) => {
                 log::info!("Received WebSocket message: {}", text);
-                // Echo the message back for now
-                ctx.text(format!("Echo: {}", text));
+                // Echo the message back
+                ctx.text(text);
             }
             Ok(ws::Message::Binary(bin)) => {
-                log::info!("Received binary message: {} bytes", bin.len());
+                log::info!("Received binary message of {} bytes", bin.len());
+                ctx.binary(bin);
             }
             Ok(ws::Message::Close(reason)) => {
                 log::info!("WebSocket closing: {:?}", reason);
@@ -46,7 +60,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WebSocketActor {
     }
 }
 
-// Simple WebSocket route handler
+// WebSocket route handler
 pub async fn websocket_route(
     req: actix_web::HttpRequest,
     stream: actix_web::web::Payload,
