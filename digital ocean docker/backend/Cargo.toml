@@ -7,7 +7,7 @@ edition = "2021"
 actix-web = "4.11"
 actix-cors = "0.7"
 actix = "0.13"
-actix-web-actors = "0.2"
+actix-web-actors = "4.3"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tokio = { version = "1.47", features = ["macros", "rt-multi-thread"] }
