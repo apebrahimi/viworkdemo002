@@ -4,7 +4,7 @@ use std::io;
 
 // Import WebSocket modules
 mod websocket;
-use websocket::{WebSocketSessionManager, websocket_route};
+use websocket::websocket_route;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct LoginRequest {
@@ -230,12 +230,8 @@ async fn main() -> io::Result<()> {
     
     // Create server with graceful shutdown and better error handling
     let server = HttpServer::new(|| {
-        // Create WebSocket session manager
-        let session_manager = web::Data::new(WebSocketSessionManager::new());
-        
         App::new()
             // WebSocket endpoint
-            .app_data(session_manager.clone())
             .route("/ws", web::get().to(websocket_route))
             
             // Health check endpoints
