@@ -58,7 +58,7 @@ export function DemoDashboardSection() {
     const fetchDemoData = async () => {
       try {
         // Test backend health
-        const healthResponse = await fetch('/health');
+        const healthResponse = await fetch('/api/v1/health');
         const healthData = await healthResponse.json();
         
         // Generate demo activity with Persian messages
@@ -436,7 +436,7 @@ export function DemoDashboardSection() {
           <button 
             onClick={async () => {
               try {
-                const response = await fetch('/health');
+                const response = await fetch('/api/v1/health');
                 const data = await response.json();
                 // eslint-disable-next-line no-console
                 console.log(`Health check: ${data.status}\nMessage: ${data.message}`);

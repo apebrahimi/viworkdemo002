@@ -1,4 +1,4 @@
-Got it. Here’s a clean, conflict-free flow + requirements plan (no code, no DB schemas) that matches your real process exactly and is ready for Cursor to implement step-by-step.
+Got it. Here’s a clean, conflict-free flow + requirements plan that matches your real process exactly and is ready for Cursor to implement step-by-step.
 
 ⸻
 
