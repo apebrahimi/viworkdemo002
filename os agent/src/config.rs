@@ -9,6 +9,7 @@ pub struct Config {
     pub scripts: ScriptsConfig,
     pub monitoring: MonitoringConfig,
     pub containers: ContainerConfig,
+    pub outbound: OutboundConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -53,6 +54,23 @@ pub struct ContainerConfig {
     pub port_range_end: u16,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OutboundConfig {
+    pub backend_url: String,
+    pub agent_id: String,
+    pub cert_path: String,
+    pub key_path: String,
+    pub trust_bundle: String,
+    pub backend_spki_pin: String,
+    pub feature_inbound_http: bool,
+    pub feature_exec_enable: bool,
+    pub scripts_root: String,
+    pub max_concurrency: usize,
+    pub cmd_timeout_secs: u64,
+    pub site: Option<String>,
+    pub container_engine: String,
+}
+
 impl Config {
     pub fn load() -> Result<Self> {
         let config_path =
@@ -71,6 +89,59 @@ impl Config {
 
         if let Ok(log_level) = std::env::var("RUST_LOG") {
             config.agent.log_level = log_level;
+        }
+
+        // Override outbound config with environment variables
+        if let Ok(backend_url) = std::env::var("VIW_AGENT_BACKEND_URL") {
+            config.outbound.backend_url = backend_url;
+        }
+
+        if let Ok(agent_id) = std::env::var("VIW_AGENT_ID") {
+            config.outbound.agent_id = agent_id;
+        }
+
+        if let Ok(cert_path) = std::env::var("VIW_AGENT_CERT_PATH") {
+            config.outbound.cert_path = cert_path;
+        }
+
+        if let Ok(key_path) = std::env::var("VIW_AGENT_KEY_PATH") {
+            config.outbound.key_path = key_path;
+        }
+
+        if let Ok(trust_bundle) = std::env::var("VIW_AGENT_TRUST_BUNDLE") {
+            config.outbound.trust_bundle = trust_bundle;
+        }
+
+        if let Ok(spki_pin) = std::env::var("VIW_AGENT_BACKEND_SPKI_PIN") {
+            config.outbound.backend_spki_pin = spki_pin;
+        }
+
+        if let Ok(feature_inbound_http) = std::env::var("VIW_AGENT_FEATURE_INBOUND_HTTP") {
+            config.outbound.feature_inbound_http = feature_inbound_http.parse().unwrap_or(false);
+        }
+
+        if let Ok(feature_exec_enable) = std::env::var("VIW_AGENT_FEATURE_EXEC_ENABLE") {
+            config.outbound.feature_exec_enable = feature_exec_enable.parse().unwrap_or(true);
+        }
+
+        if let Ok(scripts_root) = std::env::var("VIW_AGENT_SCRIPTS_ROOT") {
+            config.outbound.scripts_root = scripts_root;
+        }
+
+        if let Ok(max_concurrency) = std::env::var("VIW_AGENT_MAX_CONCURRENCY") {
+            config.outbound.max_concurrency = max_concurrency.parse().unwrap_or(4);
+        }
+
+        if let Ok(cmd_timeout_secs) = std::env::var("VIW_AGENT_CMD_TIMEOUT_SECS") {
+            config.outbound.cmd_timeout_secs = cmd_timeout_secs.parse().unwrap_or(45);
+        }
+
+        if let Ok(site) = std::env::var("VIW_AGENT_SITE") {
+            config.outbound.site = Some(site);
+        }
+
+        if let Ok(container_engine) = std::env::var("VIW_AGENT_CONTAINER_ENGINE") {
+            config.outbound.container_engine = container_engine;
         }
 
         Ok(config)
@@ -99,16 +170,33 @@ impl Config {
             },
             monitoring: MonitoringConfig {
                 collect_interval: 30,
-                retention_days: 7,
+                retention_days: 30,
                 metrics_enabled: true,
             },
             containers: ContainerConfig {
-                base_image: "alpine:latest".to_string(),
+                base_image: "viworks/chrome:latest".to_string(),
                 memory_limit: "512m".to_string(),
                 cpu_limit: "0.5".to_string(),
                 network_mode: "bridge".to_string(),
-                port_range_start: 8080,
-                port_range_end: 8090,
+                port_range_start: 8000,
+                port_range_end: 9000,
+            },
+            outbound: OutboundConfig {
+                backend_url: "wss://backend.example.com/agent".to_string(),
+                agent_id: hostname::get()
+                    .map(|h| h.to_string_lossy().to_string())
+                    .unwrap_or_else(|_| "unknown".to_string()),
+                cert_path: "/etc/viworks-agent/client.crt".to_string(),
+                key_path: "/etc/viworks-agent/client.key".to_string(),
+                trust_bundle: "/etc/viworks-agent/ca.crt".to_string(),
+                backend_spki_pin: "".to_string(), // Must be set via env
+                feature_inbound_http: false, // Default to secure outbound-only
+                feature_exec_enable: true,
+                scripts_root: "/opt/Viworks/scripts_viworks".to_string(),
+                max_concurrency: 4,
+                cmd_timeout_secs: 45,
+                site: None,
+                container_engine: "docker".to_string(),
             },
         }
     }

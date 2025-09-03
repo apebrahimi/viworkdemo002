@@ -26,7 +26,7 @@ pub enum AgentError {
     DockerError(String),
 
     #[error("Configuration error: {0}")]
-    ConfigError(String),
+    ConfigurationError(String),
 
     #[error("Authentication failed: {0}")]
     AuthenticationFailed(String),
@@ -45,6 +45,9 @@ pub enum AgentError {
 
     #[error("Internal error: {0}")]
     InternalError(String),
+
+    #[error("Connection error: {0}")]
+    ConnectionError(String),
 
     #[error("Serialization error: {0}")]
     SerializationError(#[from] serde_json::Error),
@@ -80,8 +83,8 @@ impl ResponseError for AgentError {
             AgentError::DockerError(msg) => {
                 (StatusCode::INTERNAL_SERVER_ERROR, "DOCKER_ERROR", msg)
             }
-            AgentError::ConfigError(msg) => {
-                (StatusCode::INTERNAL_SERVER_ERROR, "CONFIG_ERROR", msg)
+            AgentError::ConfigurationError(msg) => {
+                (StatusCode::INTERNAL_SERVER_ERROR, "CONFIGURATION_ERROR", msg)
             }
             AgentError::AuthenticationFailed(msg) => {
                 (StatusCode::UNAUTHORIZED, "AUTHENTICATION_FAILED", msg)
@@ -100,9 +103,16 @@ impl ResponseError for AgentError {
                 "INSUFFICIENT_RESOURCES",
                 msg,
             ),
-            AgentError::InternalError(msg) => {
-                (StatusCode::INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", msg)
-            }
+            AgentError::InternalError(msg) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "INTERNAL_ERROR",
+                msg,
+            ),
+            AgentError::ConnectionError(msg) => (
+                StatusCode::SERVICE_UNAVAILABLE,
+                "CONNECTION_ERROR",
+                msg,
+            ),
             AgentError::SerializationError(e) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "SERIALIZATION_ERROR",
@@ -113,26 +123,31 @@ impl ResponseError for AgentError {
                 "IO_ERROR",
                 &e.to_string(),
             ),
-            AgentError::SystemError(msg) => {
-                (StatusCode::INTERNAL_SERVER_ERROR, "SYSTEM_ERROR", msg)
+            AgentError::SystemError(msg) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "SYSTEM_ERROR",
+                msg,
+            ),
+        };
+
+        let error_response = serde_json::json!({
+            "error": {
+                "code": error_code,
+                "message": message,
+                "timestamp": chrono::Utc::now().to_rfc3339()
             }
-        };
+        });
 
-        let error_response = ErrorResponse {
-            error: error_code.to_string(),
-            message: message.to_string(),
-            timestamp: chrono::Utc::now().to_rfc3339(),
-        };
-
-        HttpResponse::build(status_code).json(error_response)
+        HttpResponse::build(status_code)
+            .content_type("application/json")
+            .json(error_response)
     }
 }
 
-#[derive(Serialize, Deserialize)]
-struct ErrorResponse {
-    error: String,
-    message: String,
-    timestamp: String,
+impl From<AgentError> for std::io::Error {
+    fn from(err: AgentError) -> Self {
+        std::io::Error::new(std::io::ErrorKind::Other, err.to_string())
+    }
 }
 
 pub type AgentResult<T> = Result<T, AgentError>;

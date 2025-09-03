@@ -12,6 +12,7 @@ mod docker;
 mod error;
 mod monitoring;
 mod security;
+mod outbound;
 
 use api::{execute_command, health_check, system_status, simple_status};
 use audit::AuditLogger;
@@ -20,6 +21,7 @@ use config::Config;
 use docker::DockerManager;
 use monitoring::SystemMonitor;
 use security::SecurityContext;
+use outbound::OutboundManager;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -76,6 +78,32 @@ async fn main() -> std::io::Result<()> {
         Arc::new(system_monitor.clone()),
     ));
     info!("main: Command executor initialized");
+
+    // Initialize outbound manager
+    info!("main: Initializing outbound connection manager...");
+    let outbound_manager = OutboundManager::new(config.clone());
+    info!("main: Outbound manager initialized");
+
+    // Start outbound connection (if enabled)
+    if !config.outbound.backend_url.is_empty() {
+        info!("main: Starting outbound connection to backend...");
+        if let Err(e) = outbound_manager.start().await {
+            error!("Failed to start outbound connection: {}", e);
+            // Don't exit - continue with inbound HTTP if enabled
+        }
+    }
+
+    // Check if inbound HTTP is enabled
+    if !config.outbound.feature_inbound_http {
+        info!("main: Inbound HTTP endpoints disabled by feature flag");
+        info!("main: Agent running in outbound-only mode");
+        
+        // Keep the process running for outbound connections
+        loop {
+            tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
+            info!("main: Outbound-only mode - keeping process alive");
+        }
+    }
 
     info!("main: Starting HTTP server on {}", config.agent.bind_address);
 
