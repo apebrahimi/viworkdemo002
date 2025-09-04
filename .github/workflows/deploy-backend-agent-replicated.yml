@@ -114,9 +114,9 @@ jobs:
             exit 1
           fi
           
-          # Install system dependencies first (including curl)
+          # Install system dependencies first (including curl and file)
           echo 'Installing system dependencies...'
-          apt-get update && apt-get install -y build-essential pkg-config libssl-dev curl ca-certificates
+          apt-get update && apt-get install -y build-essential pkg-config libssl-dev curl ca-certificates file
           
           # Install Rust (exact same as server)
           echo 'Installing Rust...'
