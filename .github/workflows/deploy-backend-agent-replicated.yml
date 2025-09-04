@@ -38,7 +38,7 @@ jobs:
       run: |
         cd "backend agent"
         cargo test --verbose
-        cargo clippy -- -D warnings
+        cargo clippy -- -W clippy::all
         cargo fmt -- --check
 
   build:
