@@ -95,8 +95,12 @@ jobs:
           echo 'Contents after extraction:'
           ls -la
           
-          # Find the correct directory (it might be 'backend agent' with space)
-          if [ -d 'backend agent' ]; then
+          # Check if we have the source files directly (Cargo.toml, src/, etc.)
+          if [ -f 'Cargo.toml' ] && [ -d 'src' ]; then
+            echo 'Found source files directly in /tmp - no need to cd'
+            echo 'Current directory contains:'
+            ls -la
+          elif [ -d 'backend agent' ]; then
             cd 'backend agent'
             echo 'Found directory: backend agent'
           elif [ -d 'backend-agent' ]; then
@@ -105,7 +109,7 @@ jobs:
           else
             echo 'Available directories:'
             ls -la
-            echo 'Build failed: Could not find backend agent directory'
+            echo 'Build failed: Could not find backend agent source files'
             exit 1
           fi
           
