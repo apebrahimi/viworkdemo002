@@ -87,9 +87,9 @@ jobs:
           set -e
           echo '=== Starting Build Process (Replicating Server) ==='
           
-          # Extract source code
-          cd /tmp
-          tar -xzf backend-agent-source.tar.gz
+          # Extract source code to /root to avoid /tmp permission issues
+          cd /root
+          tar -xzf /tmp/backend-agent-source.tar.gz
           
           # List contents to debug
           echo 'Contents after extraction:'
