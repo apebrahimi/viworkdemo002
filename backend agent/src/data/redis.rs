@@ -1,6 +1,6 @@
 use crate::config::RedisConfig;
 use crate::error::BackendAgentError;
-use redis::{Client, aio::ConnectionManager, RedisResult};
+use redis::{aio::ConnectionManager, Client, RedisResult};
 use std::time::Duration;
 use tracing::{error, info};
 
@@ -14,18 +14,15 @@ impl RedisClient {
     pub async fn new(config: &RedisConfig) -> Result<Self, BackendAgentError> {
         info!("Initializing Redis connection...");
 
-        let client = Client::open(config.url.as_str())
-            .map_err(|e| {
-                error!("Failed to create Redis client: {}", e);
-                BackendAgentError::Redis(e)
-            })?;
+        let client = Client::open(config.url.as_str()).map_err(|e| {
+            error!("Failed to create Redis client: {}", e);
+            BackendAgentError::Redis(e)
+        })?;
 
-        let manager = ConnectionManager::new(client.clone())
-            .await
-            .map_err(|e| {
-                error!("Failed to create Redis connection manager: {}", e);
-                BackendAgentError::Redis(e)
-            })?;
+        let manager = ConnectionManager::new(client.clone()).await.map_err(|e| {
+            error!("Failed to create Redis connection manager: {}", e);
+            BackendAgentError::Redis(e)
+        })?;
 
         info!("Redis connection initialized successfully");
 
@@ -76,9 +73,14 @@ impl RedisClient {
     // Basic Redis Operations
     // ============================================================================
 
-    pub async fn set(&self, key: &str, value: &str, ttl: Option<Duration>) -> Result<(), BackendAgentError> {
+    pub async fn set(
+        &self,
+        key: &str,
+        value: &str,
+        ttl: Option<Duration>,
+    ) -> Result<(), BackendAgentError> {
         let mut conn = self.manager.clone();
-        
+
         if let Some(ttl) = ttl {
             redis::cmd("SETEX")
                 .arg(key)
@@ -107,11 +109,9 @@ impl RedisClient {
 
     pub async fn get(&self, key: &str) -> Result<Option<String>, BackendAgentError> {
         let mut conn = self.manager.clone();
-        
-        let result: RedisResult<Option<String>> = redis::cmd("GET")
-            .arg(key)
-            .query_async(&mut conn)
-            .await;
+
+        let result: RedisResult<Option<String>> =
+            redis::cmd("GET").arg(key).query_async(&mut conn).await;
 
         match result {
             Ok(value) => Ok(value),
@@ -124,7 +124,7 @@ impl RedisClient {
 
     pub async fn del(&self, key: &str) -> Result<(), BackendAgentError> {
         let mut conn = self.manager.clone();
-        
+
         redis::cmd("DEL")
             .arg(key)
             .query_async::<_, ()>(&mut conn)
@@ -139,7 +139,7 @@ impl RedisClient {
 
     pub async fn exists(&self, key: &str) -> Result<bool, BackendAgentError> {
         let mut conn = self.manager.clone();
-        
+
         let result: i32 = redis::cmd("EXISTS")
             .arg(key)
             .query_async(&mut conn)
@@ -158,7 +158,7 @@ impl RedisClient {
 
     pub async fn hset(&self, key: &str, field: &str, value: &str) -> Result<(), BackendAgentError> {
         let mut conn = self.manager.clone();
-        
+
         redis::cmd("HSET")
             .arg(key)
             .arg(field)
@@ -175,7 +175,7 @@ impl RedisClient {
 
     pub async fn hget(&self, key: &str, field: &str) -> Result<Option<String>, BackendAgentError> {
         let mut conn = self.manager.clone();
-        
+
         let result: RedisResult<Option<String>> = redis::cmd("HGET")
             .arg(key)
             .arg(field)
@@ -193,7 +193,7 @@ impl RedisClient {
 
     pub async fn hgetall(&self, key: &str) -> Result<Vec<(String, String)>, BackendAgentError> {
         let mut conn = self.manager.clone();
-        
+
         let result: Vec<(String, String)> = redis::cmd("HGETALL")
             .arg(key)
             .query_async(&mut conn)
@@ -212,7 +212,7 @@ impl RedisClient {
 
     pub async fn lpush(&self, key: &str, value: &str) -> Result<(), BackendAgentError> {
         let mut conn = self.manager.clone();
-        
+
         redis::cmd("LPUSH")
             .arg(key)
             .arg(value)
@@ -228,11 +228,9 @@ impl RedisClient {
 
     pub async fn rpop(&self, key: &str) -> Result<Option<String>, BackendAgentError> {
         let mut conn = self.manager.clone();
-        
-        let result: RedisResult<Option<String>> = redis::cmd("RPOP")
-            .arg(key)
-            .query_async(&mut conn)
-            .await;
+
+        let result: RedisResult<Option<String>> =
+            redis::cmd("RPOP").arg(key).query_async(&mut conn).await;
 
         match result {
             Ok(value) => Ok(value),
@@ -249,7 +247,7 @@ impl RedisClient {
 
     pub async fn sadd(&self, key: &str, member: &str) -> Result<(), BackendAgentError> {
         let mut conn = self.manager.clone();
-        
+
         redis::cmd("SADD")
             .arg(key)
             .arg(member)
@@ -265,7 +263,7 @@ impl RedisClient {
 
     pub async fn smembers(&self, key: &str) -> Result<Vec<String>, BackendAgentError> {
         let mut conn = self.manager.clone();
-        
+
         let result: Vec<String> = redis::cmd("SMEMBERS")
             .arg(key)
             .query_async(&mut conn)
@@ -284,7 +282,7 @@ impl RedisClient {
 
     pub async fn expire(&self, key: &str, seconds: u64) -> Result<bool, BackendAgentError> {
         let mut conn = self.manager.clone();
-        
+
         let result: i32 = redis::cmd("EXPIRE")
             .arg(key)
             .arg(seconds)
@@ -300,7 +298,7 @@ impl RedisClient {
 
     pub async fn ttl(&self, key: &str) -> Result<i64, BackendAgentError> {
         let mut conn = self.manager.clone();
-        
+
         let result: i64 = redis::cmd("TTL")
             .arg(key)
             .query_async(&mut conn)

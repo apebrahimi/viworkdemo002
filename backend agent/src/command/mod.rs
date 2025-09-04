@@ -1,7 +1,7 @@
 pub mod engine;
-pub mod queue;
 pub mod executor;
+pub mod queue;
 
 pub use engine::CommandEngine;
-pub use queue::CommandQueue;
 pub use executor::CommandExecutor;
+pub use queue::CommandQueue;

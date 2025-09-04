@@ -1,4 +1,6 @@
-use crate::data::models::{AgentInfo, WebSocketMessage, HelloMessage, TelemetryMessage, ResultMessage, HeartbeatMessage};
+use crate::data::models::{
+    AgentInfo, HeartbeatMessage, HelloMessage, ResultMessage, TelemetryMessage, WebSocketMessage,
+};
 use crate::error::BackendAgentResult;
 use futures_util::{SinkExt, StreamExt};
 use std::sync::Arc;
@@ -11,7 +13,7 @@ use uuid::Uuid;
 pub type AgentConnectionId = String;
 
 #[derive(Debug)]
-pub struct AgentConnection<S> 
+pub struct AgentConnection<S>
 where
     S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin + std::marker::Send,
 {
@@ -28,9 +30,7 @@ impl<S> AgentConnection<S>
 where
     S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin + std::marker::Send,
 {
-    pub fn new(
-        websocket: WebSocketStream<S>,
-    ) -> Self {
+    pub fn new(websocket: WebSocketStream<S>) -> Self {
         let id = Uuid::new_v4().to_string();
         let (sender, receiver) = mpsc::unbounded_channel();
         let now = chrono::Utc::now();
@@ -48,13 +48,16 @@ where
 
     /// Handle the WebSocket connection lifecycle
     pub async fn handle_connection(&mut self) -> BackendAgentResult<()> {
-        info!("Starting agent connection handler for connection: {}", self.id);
+        info!(
+            "Starting agent connection handler for connection: {}",
+            self.id
+        );
 
         // Instead of trying to split and move the websocket, we'll handle it differently
         // We'll process messages in a loop without spawning tasks that require ownership
-        
+
         let mut interval = tokio::time::interval(tokio::time::Duration::from_millis(100));
-        
+
         loop {
             tokio::select! {
                 // Check for incoming WebSocket messages
@@ -93,7 +96,7 @@ where
                         }
                     }
                 }
-                
+
                 // Check for outgoing messages from our channel
                 message = self.receiver.recv() => {
                     match message {
@@ -117,7 +120,7 @@ where
                         }
                     }
                 }
-                
+
                 // Periodic heartbeat check
                 _ = interval.tick() => {
                     // Check if connection is stale
@@ -135,7 +138,10 @@ where
 
     /// Handle incoming text messages
     async fn handle_text_message(&mut self, text: &str) -> BackendAgentResult<()> {
-        debug!("Received text message from connection {}: {}", self.id, text);
+        debug!(
+            "Received text message from connection {}: {}",
+            self.id, text
+        );
 
         let message: WebSocketMessage = serde_json::from_str(text)
             .map_err(|e| crate::error::BackendAgentError::Serialization(e))?;
@@ -147,8 +153,9 @@ where
                 self.handle_hello_message(hello_msg).await?;
             }
             "telemetry" => {
-                let telemetry_msg: TelemetryMessage = serde_json::from_value(message.payload.clone())
-                    .map_err(|e| crate::error::BackendAgentError::Serialization(e))?;
+                let telemetry_msg: TelemetryMessage =
+                    serde_json::from_value(message.payload.clone())
+                        .map_err(|e| crate::error::BackendAgentError::Serialization(e))?;
                 self.handle_telemetry_message(telemetry_msg).await?;
             }
             "result" => {
@@ -157,12 +164,16 @@ where
                 self.handle_result_message(result_msg).await?;
             }
             "heartbeat" => {
-                let heartbeat_msg: HeartbeatMessage = serde_json::from_value(message.payload.clone())
-                    .map_err(|e| crate::error::BackendAgentError::Serialization(e))?;
+                let heartbeat_msg: HeartbeatMessage =
+                    serde_json::from_value(message.payload.clone())
+                        .map_err(|e| crate::error::BackendAgentError::Serialization(e))?;
                 self.handle_heartbeat_message(heartbeat_msg).await?;
             }
             _ => {
-                warn!("Unknown message type received from connection {}: {}", self.id, message.message_type);
+                warn!(
+                    "Unknown message type received from connection {}: {}",
+                    self.id, message.message_type
+                );
             }
         }
 
@@ -171,18 +182,28 @@ where
 
     /// Handle incoming binary messages
     async fn handle_binary_message(&mut self, data: &[u8]) -> BackendAgentResult<()> {
-        debug!("Received binary message from connection {}: {} bytes", self.id, data.len());
-        
+        debug!(
+            "Received binary message from connection {}: {} bytes",
+            self.id,
+            data.len()
+        );
+
         // For now, we'll just log binary messages
         // In the future, this could handle file uploads or other binary data
-        warn!("Binary messages not yet implemented for connection {}", self.id);
-        
+        warn!(
+            "Binary messages not yet implemented for connection {}",
+            self.id
+        );
+
         Ok(())
     }
 
     /// Handle hello message (agent authentication)
     async fn handle_hello_message(&mut self, hello_msg: HelloMessage) -> BackendAgentResult<()> {
-        info!("Processing hello message from connection {}: agent_id={}", self.id, hello_msg.agent_id);
+        info!(
+            "Processing hello message from connection {}: agent_id={}",
+            self.id, hello_msg.agent_id
+        );
 
         // Validate the hello message
         if hello_msg.agent_id.is_empty() {
@@ -220,7 +241,10 @@ where
             *auth = true;
         }
 
-        info!("Agent {} authenticated successfully on connection {}", hello_msg.agent_id, self.id);
+        info!(
+            "Agent {} authenticated successfully on connection {}",
+            hello_msg.agent_id, self.id
+        );
 
         // Send welcome message back
         let welcome_msg = WebSocketMessage {
@@ -235,7 +259,8 @@ where
                 supported_verbs: hello_msg.supported_verbs.clone(),
                 start_time: hello_msg.start_time,
                 feature_flags: hello_msg.feature_flags.clone(),
-            }).unwrap(),
+            })
+            .unwrap(),
             timestamp: chrono::Utc::now(),
             correlation_id: None,
         };
@@ -248,14 +273,20 @@ where
     }
 
     /// Handle telemetry message
-    async fn handle_telemetry_message(&mut self, telemetry_msg: TelemetryMessage) -> BackendAgentResult<()> {
+    async fn handle_telemetry_message(
+        &mut self,
+        telemetry_msg: TelemetryMessage,
+    ) -> BackendAgentResult<()> {
         if !*self.is_authenticated.read().await {
             return Err(crate::error::BackendAgentError::Authentication(
                 "Agent not authenticated".to_string(),
             ));
         }
 
-        debug!("Processing telemetry from connection {}: agent_id={}", self.id, telemetry_msg.agent_id);
+        debug!(
+            "Processing telemetry from connection {}: agent_id={}",
+            self.id, telemetry_msg.agent_id
+        );
 
         // Update last heartbeat
         {
@@ -277,7 +308,10 @@ where
             ));
         }
 
-        debug!("Processing result from connection {}: correlation_id={}", self.id, result_msg.correlation_id);
+        debug!(
+            "Processing result from connection {}: correlation_id={}",
+            self.id, result_msg.correlation_id
+        );
 
         // Update last heartbeat
         {
@@ -292,7 +326,10 @@ where
     }
 
     /// Handle heartbeat message
-    async fn handle_heartbeat_message(&mut self, _heartbeat_msg: HeartbeatMessage) -> BackendAgentResult<()> {
+    async fn handle_heartbeat_message(
+        &mut self,
+        _heartbeat_msg: HeartbeatMessage,
+    ) -> BackendAgentResult<()> {
         if !*self.is_authenticated.read().await {
             return Err(crate::error::BackendAgentError::Authentication(
                 "Agent not authenticated".to_string(),
@@ -313,9 +350,10 @@ where
     /// Send a message to the agent
     pub async fn send_message(&self, message: WebSocketMessage) -> BackendAgentResult<()> {
         if let Err(e) = self.sender.send(message) {
-            return Err(crate::error::BackendAgentError::WebSocket(
-                format!("Failed to send message: {}", e),
-            ));
+            return Err(crate::error::BackendAgentError::WebSocket(format!(
+                "Failed to send message: {}",
+                e
+            )));
         }
         Ok(())
     }
@@ -346,15 +384,15 @@ where
     /// Close the connection
     pub async fn close(&mut self) -> BackendAgentResult<()> {
         info!("Closing agent connection {}", self.id);
-        
+
         // Close the sender to stop the write task
         drop(self.sender.clone());
-        
+
         // Close the WebSocket
         if let Err(e) = self.websocket.close(None).await {
             error!("Failed to close WebSocket: {}", e);
         }
-        
+
         Ok(())
     }
 }

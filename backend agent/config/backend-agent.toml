@@ -7,7 +7,7 @@ request_timeout = 30
 cors_origins = ["*"]
 
 [database]
-url = "postgresql://viworks:viworks@localhost/viworks"
+url = "postgresql://admin:viworks_password_2024@viworks-postgres:5432/viworks_agent"
 max_connections = 10
 min_connections = 2
 connect_timeout = 10
@@ -15,7 +15,7 @@ idle_timeout = 300
 max_lifetime = 3600
 
 [redis]
-url = "redis://localhost:6379"
+url = "redis://viworks-redis:6379"
 pool_size = 10
 connection_timeout = 5
 read_timeout = 3
@@ -31,6 +31,8 @@ rate_limit_requests = 100
 rate_limit_window = 60
 
 [agent_management]
+bind_address = "0.0.0.0"
+port = 8081
 max_agent_connections = 100
 heartbeat_interval = 30
 connection_timeout = 60

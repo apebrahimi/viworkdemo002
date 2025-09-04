@@ -1,8 +1,10 @@
 use crate::agent::AgentManager;
-use crate::command::{CommandQueue, CommandExecutor, queue::QueuedCommand};
+use crate::command::{queue::QueuedCommand, CommandExecutor, CommandQueue};
 use crate::config::Config;
+use crate::data::models::{
+    CommandMessage, CommandRecord, CommandResult, CommandStatus, WebSocketMessage,
+};
 use crate::data::DataLayer;
-use crate::data::models::{CommandRecord, CommandResult, CommandStatus, CommandMessage, WebSocketMessage};
 use crate::error::BackendAgentResult;
 use dashmap::DashMap;
 use std::sync::Arc;
@@ -24,7 +26,11 @@ pub struct CommandEngine {
 }
 
 impl CommandEngine {
-    pub async fn new(config: Config, data_layer: DataLayer, agent_manager: Arc<AgentManager>) -> BackendAgentResult<Self> {
+    pub async fn new(
+        config: Config,
+        data_layer: DataLayer,
+        agent_manager: Arc<AgentManager>,
+    ) -> BackendAgentResult<Self> {
         info!("Initializing Command Engine...");
 
         let queue = Arc::new(CommandQueue::new(config.command.max_command_queue_size));
@@ -82,7 +88,7 @@ impl CommandEngine {
     /// Submit a command for execution
     pub async fn submit_command(&self, command: CommandRecord) -> BackendAgentResult<String> {
         let correlation_id = command.correlation_id.clone();
-        
+
         info!("Submitting command: {} ({})", correlation_id, command.verb);
 
         // Validate command
@@ -99,9 +105,16 @@ impl CommandEngine {
     }
 
     /// Execute a command on target agents
-    pub async fn execute_command(&self, command: &CommandRecord) -> BackendAgentResult<Vec<String>> {
+    pub async fn execute_command(
+        &self,
+        command: &CommandRecord,
+    ) -> BackendAgentResult<Vec<String>> {
         let correlation_id = command.correlation_id.clone();
-        info!("Executing command: {} on {} agents", correlation_id, command.agent_targets.len());
+        info!(
+            "Executing command: {} on {} agents",
+            correlation_id,
+            command.agent_targets.len()
+        );
 
         let mut successful_agents = Vec::new();
         let mut failed_agents = Vec::new();
@@ -115,7 +128,8 @@ impl CommandEngine {
             policy_id: "default".to_string(), // TODO: Get from config
             nonce: Uuid::new_v4().to_string(),
             issued_at: chrono::Utc::now().timestamp() as u64,
-            expires_at: (chrono::Utc::now().timestamp() + self.config.command.command_timeout as i64) as u64,
+            expires_at: (chrono::Utc::now().timestamp()
+                + self.config.command.command_timeout as i64) as u64,
             agent_targets: command.agent_targets.clone(),
         };
 
@@ -128,7 +142,11 @@ impl CommandEngine {
 
         // Send command to each target agent
         for agent_id in &command.agent_targets {
-            match self.agent_manager.send_command_to_agent(agent_id, command_message.clone()).await {
+            match self
+                .agent_manager
+                .send_command_to_agent(agent_id, command_message.clone())
+                .await
+            {
                 Ok(_) => {
                     successful_agents.push(agent_id.clone());
                     debug!("Command sent to agent {} successfully", agent_id);
@@ -141,24 +159,41 @@ impl CommandEngine {
         }
 
         if !failed_agents.is_empty() {
-            warn!("Failed to send command to {} agents: {:?}", failed_agents.len(), failed_agents);
+            warn!(
+                "Failed to send command to {} agents: {:?}",
+                failed_agents.len(),
+                failed_agents
+            );
         }
 
-        info!("Command {} executed on {} agents successfully, {} failed", 
-            correlation_id, successful_agents.len(), failed_agents.len());
+        info!(
+            "Command {} executed on {} agents successfully, {} failed",
+            correlation_id,
+            successful_agents.len(),
+            failed_agents.len()
+        );
 
         Ok(successful_agents)
     }
 
     /// Process command results from agents
-    pub async fn process_command_result(&self, correlation_id: &str, result: CommandResult) -> BackendAgentResult<()> {
+    pub async fn process_command_result(
+        &self,
+        correlation_id: &str,
+        result: CommandResult,
+    ) -> BackendAgentResult<()> {
         info!("Processing result for command: {}", correlation_id);
 
         // Update command status in database
-        self.data_layer.postgres.update_command_status(correlation_id, &CommandStatus::Completed).await?;
+        self.data_layer
+            .postgres
+            .update_command_status(correlation_id, &CommandStatus::Completed)
+            .await?;
 
         // Mark command as completed in queue
-        self.queue.mark_completed(correlation_id, result.clone()).await?;
+        self.queue
+            .mark_completed(correlation_id, result.clone())
+            .await?;
 
         // Remove from active commands
         self.active_commands.remove(correlation_id);
@@ -171,14 +206,23 @@ impl CommandEngine {
     }
 
     /// Process command failure
-    pub async fn process_command_failure(&self, correlation_id: &str, error_message: String) -> BackendAgentResult<()> {
+    pub async fn process_command_failure(
+        &self,
+        correlation_id: &str,
+        error_message: String,
+    ) -> BackendAgentResult<()> {
         info!("Processing failure for command: {}", correlation_id);
 
         // Update command status in database
-        self.data_layer.postgres.update_command_status(correlation_id, &CommandStatus::Failed).await?;
+        self.data_layer
+            .postgres
+            .update_command_status(correlation_id, &CommandStatus::Failed)
+            .await?;
 
         // Mark command as failed in queue
-        self.queue.mark_failed(correlation_id, error_message.clone()).await?;
+        self.queue
+            .mark_failed(correlation_id, error_message.clone())
+            .await?;
 
         // Remove from active commands
         self.active_commands.remove(correlation_id);
@@ -235,7 +279,10 @@ impl CommandEngine {
         info!("Retrying command: {}", correlation_id);
 
         // Update command status in database
-        self.data_layer.postgres.update_command_status(correlation_id, &CommandStatus::Pending).await?;
+        self.data_layer
+            .postgres
+            .update_command_status(correlation_id, &CommandStatus::Pending)
+            .await?;
 
         // Retry command in queue
         self.queue.retry_command(correlation_id).await?;
@@ -263,46 +310,55 @@ impl CommandEngine {
 
         while *self.is_running.read().await {
             // Try to acquire semaphore permit
-            let permit = match timeout(
-                Duration::from_secs(1),
-                self.command_semaphore.acquire()
-            ).await {
-                Ok(Ok(permit)) => permit,
-                Ok(Err(_)) => {
-                    error!("Failed to acquire semaphore permit");
-                    continue;
-                }
-                Err(_) => {
-                    // Timeout - check if we should continue
-                    continue;
-                }
-            };
+            let permit =
+                match timeout(Duration::from_secs(1), self.command_semaphore.acquire()).await {
+                    Ok(Ok(permit)) => permit,
+                    Ok(Err(_)) => {
+                        error!("Failed to acquire semaphore permit");
+                        continue;
+                    }
+                    Err(_) => {
+                        // Timeout - check if we should continue
+                        continue;
+                    }
+                };
 
             // Dequeue next command
             if let Some(queued_command) = self.queue.dequeue().await {
                 let correlation_id = queued_command.command.correlation_id.clone();
-                
-                info!("Processing command: {} ({})", correlation_id, queued_command.command.verb);
+
+                info!(
+                    "Processing command: {} ({})",
+                    correlation_id, queued_command.command.verb
+                );
 
                 // Add to active commands
-                self.active_commands.insert(correlation_id.clone(), queued_command.clone());
+                self.active_commands
+                    .insert(correlation_id.clone(), queued_command.clone());
 
                 // Execute command
                 match self.execute_command(&queued_command.command).await {
                     Ok(successful_agents) => {
                         if successful_agents.is_empty() {
                             // All agents failed
-                            self.process_command_failure(&correlation_id, 
-                                "Failed to send command to any target agents".to_string()).await?;
+                            self.process_command_failure(
+                                &correlation_id,
+                                "Failed to send command to any target agents".to_string(),
+                            )
+                            .await?;
                         } else {
                             // Command sent successfully, wait for results
-                            debug!("Command {} sent to {} agents, waiting for results", 
-                                correlation_id, successful_agents.len());
+                            debug!(
+                                "Command {} sent to {} agents, waiting for results",
+                                correlation_id,
+                                successful_agents.len()
+                            );
                         }
                     }
                     Err(e) => {
                         error!("Failed to execute command {}: {}", correlation_id, e);
-                        self.process_command_failure(&correlation_id, e.to_string()).await?;
+                        self.process_command_failure(&correlation_id, e.to_string())
+                            .await?;
                     }
                 }
             } else {
@@ -317,7 +373,10 @@ impl CommandEngine {
 
     /// Wait for active commands to complete
     async fn wait_for_active_commands(&self) {
-        info!("Waiting for {} active commands to complete...", self.active_commands.len());
+        info!(
+            "Waiting for {} active commands to complete...",
+            self.active_commands.len()
+        );
 
         let mut attempts = 0;
         const MAX_ATTEMPTS: u32 = 30; // 30 seconds
@@ -328,7 +387,10 @@ impl CommandEngine {
         }
 
         if !self.active_commands.is_empty() {
-            warn!("{} commands still active after timeout", self.active_commands.len());
+            warn!(
+                "{} commands still active after timeout",
+                self.active_commands.len()
+            );
         } else {
             info!("All active commands completed");
         }
@@ -344,11 +406,12 @@ impl CommandEngine {
         // Cleanup task
         let cleanup_task = tokio::spawn(async move {
             let mut interval = tokio::time::interval(Duration::from_secs(3600)); // Every hour
-            
+
             loop {
                 interval.tick().await;
-                
-                if let Err(e) = queue.cleanup_old_commands(24).await { // 24 hours threshold
+
+                if let Err(e) = queue.cleanup_old_commands(24).await {
+                    // 24 hours threshold
                     error!("Command cleanup failed: {}", e);
                 }
             }
@@ -371,7 +434,10 @@ impl CommandEngine {
         // Check if command is in active commands
         if let Some(command) = self.active_commands.remove(correlation_id) {
             // Update command status in database
-            self.data_layer.postgres.update_command_status(correlation_id, &CommandStatus::Cancelled).await?;
+            self.data_layer
+                .postgres
+                .update_command_status(correlation_id, &CommandStatus::Cancelled)
+                .await?;
 
             // Release semaphore permit
             self.command_semaphore.add_permits(1);
@@ -387,25 +453,25 @@ impl CommandEngine {
     /// Get command execution history
     pub async fn get_command_history(&self, limit: Option<usize>) -> Vec<QueuedCommand> {
         let mut all_commands = Vec::new();
-        
+
         // Get completed commands
         all_commands.extend(self.queue.get_completed_commands().await);
-        
+
         // Get failed commands
         all_commands.extend(self.queue.get_failed_commands().await);
-        
+
         // Sort by completion time (most recent first)
         all_commands.sort_by(|a, b| {
             let a_time = a.command.completed_at.unwrap_or(a.command.created_at);
             let b_time = b.command.completed_at.unwrap_or(b.command.created_at);
             b_time.cmp(&a_time)
         });
-        
+
         // Apply limit if specified
         if let Some(limit) = limit {
             all_commands.truncate(limit);
         }
-        
+
         all_commands
     }
 }

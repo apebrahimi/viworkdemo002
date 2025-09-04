@@ -10,9 +10,9 @@ use tracing::{debug, error, info, warn};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Claims {
-    pub sub: String, // Subject (user ID)
-    pub iat: usize,  // Issued at
-    pub exp: usize,  // Expiration
+    pub sub: String,  // Subject (user ID)
+    pub iat: usize,   // Issued at
+    pub exp: usize,   // Expiration
     pub role: String, // User role
 }
 
@@ -55,16 +55,19 @@ impl AuthService {
     /// Generate a JWT token
     pub fn generate_token(&self, claims: Claims) -> BackendAgentResult<String> {
         let header = Header::new(Algorithm::HS256);
-        
-        encode(&header, &claims, &self.encoding_key)
-            .map_err(|e| crate::error::BackendAgentError::Internal(format!("Failed to generate token: {}", e)))
+
+        encode(&header, &claims, &self.encoding_key).map_err(|e| {
+            crate::error::BackendAgentError::Internal(format!("Failed to generate token: {}", e))
+        })
     }
 
     /// Validate a JWT token
     pub fn validate_token(&self, token: &str) -> BackendAgentResult<Claims> {
         decode::<Claims>(token, &self.decoding_key, &self.validation)
             .map(|token_data| token_data.claims)
-            .map_err(|e| crate::error::BackendAgentError::Authorization(format!("Invalid token: {}", e)))
+            .map_err(|e| {
+                crate::error::BackendAgentError::Authorization(format!("Invalid token: {}", e))
+            })
     }
 
     /// Check if user has required role
@@ -95,7 +98,7 @@ pub async fn jwt_validator(
     match auth_service.validate_token(credentials.token()) {
         Ok(claims) => {
             debug!("JWT validation successful for user: {}", claims.sub);
-            
+
             // Store claims in request extensions
             let mut req = req;
             req.extensions_mut().insert(claims);

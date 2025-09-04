@@ -1,4 +1,4 @@
-use crate::data::models::{CommandRecord, CommandStatus, CommandPriority};
+use crate::data::models::{CommandPriority, CommandRecord, CommandStatus};
 use crate::error::BackendAgentResult;
 use dashmap::DashMap;
 use std::collections::BinaryHeap;
@@ -61,7 +61,7 @@ pub struct CommandQueue {
     pending: Arc<DashMap<String, QueuedCommand>>, // correlation_id -> command
     executing: Arc<DashMap<String, QueuedCommand>>, // correlation_id -> command
     completed: Arc<DashMap<String, QueuedCommand>>, // correlation_id -> command
-    failed: Arc<DashMap<String, QueuedCommand>>, // correlation_id -> command
+    failed: Arc<DashMap<String, QueuedCommand>>,  // correlation_id -> command
     priority_queue: Arc<RwLock<BinaryHeap<QueuedCommand>>>,
     max_queue_size: usize,
 }
@@ -89,10 +89,14 @@ impl CommandQueue {
         let queued_command = QueuedCommand::new(command.clone());
         let correlation_id = command.correlation_id.clone();
 
-        info!("Enqueuing command: {} (priority: {:?})", correlation_id, queued_command.priority);
+        info!(
+            "Enqueuing command: {} (priority: {:?})",
+            correlation_id, queued_command.priority
+        );
 
         // Add to pending map
-        self.pending.insert(correlation_id.clone(), queued_command.clone());
+        self.pending
+            .insert(correlation_id.clone(), queued_command.clone());
 
         // Add to priority queue
         {
@@ -107,18 +111,19 @@ impl CommandQueue {
     /// Get the next command to execute (highest priority)
     pub async fn dequeue(&self) -> Option<QueuedCommand> {
         let mut queue = self.priority_queue.write().await;
-        
+
         while let Some(command) = queue.pop() {
             let correlation_id = command.command.correlation_id.clone();
-            
+
             // Check if command is still pending
             if self.pending.contains_key(&correlation_id) {
                 // Remove from pending
                 self.pending.remove(&correlation_id);
-                
+
                 // Add to executing
-                self.executing.insert(correlation_id.clone(), command.clone());
-                
+                self.executing
+                    .insert(correlation_id.clone(), command.clone());
+
                 debug!("Dequeued command: {} for execution", correlation_id);
                 return Some(command);
             }
@@ -128,36 +133,52 @@ impl CommandQueue {
     }
 
     /// Mark a command as completed
-    pub async fn mark_completed(&self, correlation_id: &str, result: crate::data::models::CommandResult) -> BackendAgentResult<()> {
+    pub async fn mark_completed(
+        &self,
+        correlation_id: &str,
+        result: crate::data::models::CommandResult,
+    ) -> BackendAgentResult<()> {
         if let Some(command) = self.executing.remove(correlation_id) {
             let mut completed_command = command.1;
             completed_command.command.status = CommandStatus::Completed;
             completed_command.command.result = Some(result);
             completed_command.command.completed_at = Some(chrono::Utc::now());
 
-            self.completed.insert(correlation_id.to_string(), completed_command);
-            
+            self.completed
+                .insert(correlation_id.to_string(), completed_command);
+
             info!("Command {} marked as completed", correlation_id);
         } else {
-            warn!("Attempted to mark unknown command as completed: {}", correlation_id);
+            warn!(
+                "Attempted to mark unknown command as completed: {}",
+                correlation_id
+            );
         }
 
         Ok(())
     }
 
     /// Mark a command as failed
-    pub async fn mark_failed(&self, correlation_id: &str, error_message: String) -> BackendAgentResult<()> {
+    pub async fn mark_failed(
+        &self,
+        correlation_id: &str,
+        error_message: String,
+    ) -> BackendAgentResult<()> {
         if let Some(command) = self.executing.remove(correlation_id) {
             let mut failed_command = command.1;
             failed_command.command.status = CommandStatus::Failed;
             failed_command.command.error_message = Some(error_message);
             failed_command.command.completed_at = Some(chrono::Utc::now());
 
-            self.failed.insert(correlation_id.to_string(), failed_command);
-            
+            self.failed
+                .insert(correlation_id.to_string(), failed_command);
+
             info!("Command {} marked as failed", correlation_id);
         } else {
-            warn!("Attempted to mark unknown command as failed: {}", correlation_id);
+            warn!(
+                "Attempted to mark unknown command as failed: {}",
+                correlation_id
+            );
         }
 
         Ok(())
@@ -167,7 +188,7 @@ impl CommandQueue {
     pub async fn retry_command(&self, correlation_id: &str) -> BackendAgentResult<()> {
         if let Some(command) = self.failed.remove(correlation_id) {
             let mut retry_command = command.1;
-            
+
             if retry_command.can_retry() {
                 retry_command.increment_retry();
                 retry_command.command.status = CommandStatus::Pending;
@@ -176,7 +197,8 @@ impl CommandQueue {
                 retry_command.queued_at = chrono::Utc::now();
 
                 // Add back to pending
-                self.pending.insert(correlation_id.to_string(), retry_command.clone());
+                self.pending
+                    .insert(correlation_id.to_string(), retry_command.clone());
 
                 // Add back to priority queue
                 {
@@ -184,9 +206,15 @@ impl CommandQueue {
                     queue.push(retry_command.clone());
                 }
 
-                info!("Command {} retried (attempt {})", correlation_id, retry_command.retry_count);
+                info!(
+                    "Command {} retried (attempt {})",
+                    correlation_id, retry_command.retry_count
+                );
             } else {
-                warn!("Command {} cannot be retried (max attempts reached)", correlation_id);
+                warn!(
+                    "Command {} cannot be retried (max attempts reached)",
+                    correlation_id
+                );
             }
         } else {
             warn!("Attempted to retry unknown command: {}", correlation_id);
@@ -240,7 +268,10 @@ impl CommandQueue {
             executing: self.executing.len(),
             completed: self.completed.len(),
             failed: self.failed.len(),
-            total: self.pending.len() + self.executing.len() + self.completed.len() + self.failed.len(),
+            total: self.pending.len()
+                + self.executing.len()
+                + self.completed.len()
+                + self.failed.len(),
         }
     }
 
@@ -250,7 +281,8 @@ impl CommandQueue {
         let mut removed_count = 0;
 
         // Clean up completed commands
-        let to_remove: Vec<String> = self.completed
+        let to_remove: Vec<String> = self
+            .completed
             .iter()
             .filter(|entry| {
                 if let Some(completed_at) = entry.command.completed_at {
@@ -268,7 +300,8 @@ impl CommandQueue {
         }
 
         // Clean up failed commands
-        let to_remove: Vec<String> = self.failed
+        let to_remove: Vec<String> = self
+            .failed
             .iter()
             .filter(|entry| {
                 if let Some(completed_at) = entry.command.completed_at {
@@ -306,81 +339,81 @@ impl CommandQueue {
     /// Get commands by priority
     pub async fn get_commands_by_priority(&self, priority: &CommandPriority) -> Vec<QueuedCommand> {
         let mut commands = Vec::new();
-        
+
         for entry in self.pending.iter() {
             if entry.priority == *priority {
                 commands.push(entry.clone());
             }
         }
-        
+
         for entry in self.executing.iter() {
             if entry.priority == *priority {
                 commands.push(entry.clone());
             }
         }
-        
+
         commands
     }
 
     /// Get commands for a specific agent
     pub async fn get_commands_for_agent(&self, agent_id: &str) -> Vec<QueuedCommand> {
         let mut commands = Vec::new();
-        
+
         for entry in self.pending.iter() {
             if entry.command.agent_targets.contains(&agent_id.to_string()) {
                 commands.push(entry.clone());
             }
         }
-        
+
         for entry in self.executing.iter() {
             if entry.command.agent_targets.contains(&agent_id.to_string()) {
                 commands.push(entry.clone());
             }
         }
-        
+
         for entry in self.completed.iter() {
             if entry.command.agent_targets.contains(&agent_id.to_string()) {
                 commands.push(entry.clone());
             }
         }
-        
+
         for entry in self.failed.iter() {
             if entry.command.agent_targets.contains(&agent_id.to_string()) {
                 commands.push(entry.clone());
             }
         }
-        
+
         commands
     }
 
     /// Get commands by verb (command type)
     pub async fn get_commands_by_verb(&self, verb: &str) -> Vec<QueuedCommand> {
         let mut commands = Vec::new();
-        
+
         for entry in self.pending.iter() {
             if entry.command.verb == verb {
                 commands.push(entry.clone());
             }
         }
-        
+
         for entry in self.executing.iter() {
             if entry.command.verb == verb {
                 commands.push(entry.clone());
             }
         }
-        
+
         for entry in self.completed.iter() {
             if entry.command.verb == verb {
                 commands.push(entry.clone());
             }
         }
-        
+
         for entry in self.failed.iter() {
             if entry.command.verb == verb {
                 commands.push(entry.clone());
             }
         }
-        
+
         commands
     }
 }

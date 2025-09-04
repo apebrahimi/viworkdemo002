@@ -1,15 +1,15 @@
-use actix_web::{App, HttpServer, middleware::Logger, web, HttpResponse};
 use actix_cors::Cors;
+use actix_web::{middleware::Logger, web, App, HttpResponse, HttpServer};
 use clap::Parser;
 use tokio::signal;
 use tracing::{error, info};
 
-mod config;
-mod error;
-mod data;
 mod agent;
-mod command;
 mod api;
+mod command;
+mod config;
+mod data;
+mod error;
 mod telemetry;
 
 use config::Config;
@@ -68,16 +68,22 @@ async fn main() -> BackendAgentResult<()> {
     // Initialize components
     let agent_manager = agent::AgentManager::new(config.clone(), data_layer.clone()).await?;
     let agent_manager_arc = Arc::new(agent_manager);
-    
-    let command_engine = command::CommandEngine::new(config.clone(), data_layer.clone(), agent_manager_arc.clone()).await?;
+
+    let command_engine = command::CommandEngine::new(
+        config.clone(),
+        data_layer.clone(),
+        agent_manager_arc.clone(),
+    )
+    .await?;
     let command_engine_arc = Arc::new(command_engine);
-    
-    let telemetry_processor = telemetry::TelemetryProcessor::new(config.clone(), data_layer.clone()).await?;
+
+    let telemetry_processor =
+        telemetry::TelemetryProcessor::new(config.clone(), data_layer.clone()).await?;
     let telemetry_processor_arc = Arc::new(telemetry_processor);
 
     // Start background tasks
     info!("Starting background tasks...");
-    
+
     let agent_bg_task = {
         let agent_manager = agent_manager_arc.clone();
         tokio::spawn(async move {
@@ -111,21 +117,23 @@ async fn main() -> BackendAgentResult<()> {
     // Start HTTP server
     let bind_address = format!("{}:{}", config.server.bind_address, config.server.port);
     info!("Starting HTTP server on {}", bind_address);
-    info!("Server config: workers={}, max_connections={}, request_timeout={}", 
-          config.server.workers, config.server.max_connections, config.server.request_timeout);
+    info!(
+        "Server config: workers={}, max_connections={}, request_timeout={}",
+        config.server.workers, config.server.max_connections, config.server.request_timeout
+    );
 
     let server_config = config.server.clone();
     info!("Creating HttpServer with config: {:?}", server_config);
-    
+
     // Create minimal test server first
     info!("Creating minimal test server...");
     let test_server = HttpServer::new(|| {
         info!("Creating minimal App instance");
-        App::new()
-            .wrap(Logger::default())
-            .route("/health", web::get().to(|| async { 
-                HttpResponse::Ok().json(serde_json::json!({"status": "healthy"}))
-            }))
+        App::new().wrap(Logger::default()).route(
+            "/health",
+            web::get()
+                .to(|| async { HttpResponse::Ok().json(serde_json::json!({"status": "healthy"})) }),
+        )
     })
     .workers(1)
     .max_connections(100)
@@ -133,35 +141,37 @@ async fn main() -> BackendAgentResult<()> {
     .keep_alive(std::time::Duration::from_secs(30))
     .shutdown_timeout(30)
     .disable_signals();
-    
-    info!("Test server created, attempting to bind to {}", bind_address);
-    
-    let test_server = test_server.bind(&bind_address)
-        .map_err(|e| {
-            error!("Failed to bind test server to {}: {}", bind_address, e);
-            error::BackendAgentError::Internal(format!("Failed to bind test server: {}", e))
-        })?;
+
+    info!(
+        "Test server created, attempting to bind to {}",
+        bind_address
+    );
+
+    let test_server = test_server.bind(&bind_address).map_err(|e| {
+        error!("Failed to bind test server to {}: {}", bind_address, e);
+        error::BackendAgentError::Internal(format!("Failed to bind test server: {}", e))
+    })?;
 
     info!("Test server bound successfully to {}", bind_address);
     info!("Test server started successfully");
 
     // Start the test server with panic handling
     info!("Calling test_server.run()...");
-    
+
     // Set up panic hook to catch any panics
     std::panic::set_hook(Box::new(|panic_info| {
         error!("Test server panic: {:?}", panic_info);
     }));
-    
+
     let test_server_handle = test_server.run();
     info!("Test server handle created, waiting for events...");
 
     // Wait for shutdown signal or server error
     info!("Starting server and waiting for shutdown signal...");
-    
+
     // Run the server until shutdown signal is received
     let shutdown_future = shutdown_signal();
-    
+
     tokio::select! {
         result = test_server_handle => {
             match result {
@@ -194,8 +204,9 @@ async fn main() -> BackendAgentResult<()> {
 }
 
 fn setup_logging(log_level: &str) -> BackendAgentResult<()> {
-    let env_filter = tracing_subscriber::EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new(format!("viworks_backend_agent={}", log_level)));
+    let env_filter = tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+        tracing_subscriber::EnvFilter::new(format!("viworks_backend_agent={}", log_level))
+    });
 
     let subscriber = tracing_subscriber::FmtSubscriber::builder()
         .with_env_filter(env_filter)
@@ -208,11 +219,10 @@ fn setup_logging(log_level: &str) -> BackendAgentResult<()> {
         .json()
         .finish();
 
-    tracing::subscriber::set_global_default(subscriber)
-        .map_err(|e| {
-            error!("Failed to set global default subscriber: {}", e);
-            error::BackendAgentError::Internal(format!("Failed to setup logging: {}", e))
-        })?;
+    tracing::subscriber::set_global_default(subscriber).map_err(|e| {
+        error!("Failed to set global default subscriber: {}", e);
+        error::BackendAgentError::Internal(format!("Failed to setup logging: {}", e))
+    })?;
 
     info!("Logging initialized with level: {}", log_level);
     Ok(())
@@ -220,12 +230,11 @@ fn setup_logging(log_level: &str) -> BackendAgentResult<()> {
 
 fn load_config(config_path: &str) -> BackendAgentResult<Config> {
     std::env::set_var("BACKEND_AGENT_CONFIG", config_path);
-    
-    Config::load()
-        .map_err(|e| {
-            error!("Failed to load configuration: {}", e);
-            error::BackendAgentError::Configuration(format!("Failed to load config: {}", e))
-        })
+
+    Config::load().map_err(|e| {
+        error!("Failed to load configuration: {}", e);
+        error::BackendAgentError::Configuration(format!("Failed to load config: {}", e))
+    })
 }
 
 async fn shutdown_signal() {

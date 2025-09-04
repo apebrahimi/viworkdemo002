@@ -1,6 +1,6 @@
 use crate::config::DatabaseConfig;
-use crate::error::BackendAgentError;
 use crate::data::models::*;
+use crate::error::BackendAgentError;
 use sqlx::{postgres::PgPoolOptions, PgPool, Row};
 use std::time::Duration;
 use tracing::{error, info, warn};
@@ -115,13 +115,10 @@ impl PostgresClient {
             )
         "#;
 
-        sqlx::query(sql)
-            .execute(&self.pool)
-            .await
-            .map_err(|e| {
-                error!("Failed to create agents table: {}", e);
-                BackendAgentError::Database(e)
-            })?;
+        sqlx::query(sql).execute(&self.pool).await.map_err(|e| {
+            error!("Failed to create agents table: {}", e);
+            BackendAgentError::Database(e)
+        })?;
 
         Ok(())
     }
@@ -148,13 +145,10 @@ impl PostgresClient {
             )
         "#;
 
-        sqlx::query(sql)
-            .execute(&self.pool)
-            .await
-            .map_err(|e| {
-                error!("Failed to create commands table: {}", e);
-                BackendAgentError::Database(e)
-            })?;
+        sqlx::query(sql).execute(&self.pool).await.map_err(|e| {
+            error!("Failed to create commands table: {}", e);
+            BackendAgentError::Database(e)
+        })?;
 
         Ok(())
     }
@@ -176,13 +170,10 @@ impl PostgresClient {
             )
         "#;
 
-        sqlx::query(sql)
-            .execute(&self.pool)
-            .await
-            .map_err(|e| {
-                error!("Failed to create telemetry table: {}", e);
-                BackendAgentError::Database(e)
-            })?;
+        sqlx::query(sql).execute(&self.pool).await.map_err(|e| {
+            error!("Failed to create telemetry table: {}", e);
+            BackendAgentError::Database(e)
+        })?;
 
         Ok(())
     }
@@ -205,13 +196,10 @@ impl PostgresClient {
             )
         "#;
 
-        sqlx::query(sql)
-            .execute(&self.pool)
-            .await
-            .map_err(|e| {
-                error!("Failed to create audit_logs table: {}", e);
-                BackendAgentError::Database(e)
-            })?;
+        sqlx::query(sql).execute(&self.pool).await.map_err(|e| {
+            error!("Failed to create audit_logs table: {}", e);
+            BackendAgentError::Database(e)
+        })?;
 
         Ok(())
     }
@@ -331,13 +319,10 @@ impl PostgresClient {
     pub async fn list_agents(&self) -> Result<Vec<AgentInfo>, BackendAgentError> {
         let sql = "SELECT * FROM agents ORDER BY last_seen DESC";
 
-        let rows = sqlx::query(sql)
-            .fetch_all(&self.pool)
-            .await
-            .map_err(|e| {
-                error!("Failed to list agents: {}", e);
-                BackendAgentError::Database(e)
-            })?;
+        let rows = sqlx::query(sql).fetch_all(&self.pool).await.map_err(|e| {
+            error!("Failed to list agents: {}", e);
+            BackendAgentError::Database(e)
+        })?;
 
         let mut agents = Vec::new();
         for row in rows {
@@ -421,7 +406,10 @@ impl PostgresClient {
         Ok(())
     }
 
-    pub async fn get_command(&self, correlation_id: &str) -> Result<Option<CommandRecord>, BackendAgentError> {
+    pub async fn get_command(
+        &self,
+        correlation_id: &str,
+    ) -> Result<Option<CommandRecord>, BackendAgentError> {
         let sql = "SELECT * FROM commands WHERE correlation_id = $1";
 
         let row = sqlx::query(sql)
@@ -440,8 +428,8 @@ impl PostgresClient {
                     .map_err(|e| BackendAgentError::Serialization(e))?;
 
                 let result_json: Option<serde_json::Value> = row.get("result");
-                let result = result_json
-                    .and_then(|json| serde_json::from_value::<CommandResult>(json).ok());
+                let result =
+                    result_json.and_then(|json| serde_json::from_value::<CommandResult>(json).ok());
 
                 let command = CommandRecord {
                     id: row.get("id"),
@@ -491,7 +479,10 @@ impl PostgresClient {
     // Telemetry Queries
     // ============================================================================
 
-    pub async fn store_telemetry(&self, telemetry: &TelemetryRecord) -> Result<(), BackendAgentError> {
+    pub async fn store_telemetry(
+        &self,
+        telemetry: &TelemetryRecord,
+    ) -> Result<(), BackendAgentError> {
         let sql = r#"
             INSERT INTO telemetry (
                 agent_id, timestamp, cpu_usage, memory_usage, disk_usage,
@@ -528,7 +519,10 @@ impl PostgresClient {
         Ok(())
     }
 
-    pub async fn get_latest_telemetry(&self, agent_id: &str) -> Result<Option<TelemetryRecord>, BackendAgentError> {
+    pub async fn get_latest_telemetry(
+        &self,
+        agent_id: &str,
+    ) -> Result<Option<TelemetryRecord>, BackendAgentError> {
         let sql = "SELECT * FROM telemetry WHERE agent_id = $1 ORDER BY timestamp DESC LIMIT 1";
 
         let row = sqlx::query(sql)

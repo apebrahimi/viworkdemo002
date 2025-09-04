@@ -27,20 +27,20 @@ impl DataLayer {
     pub async fn health_check(&self) -> BackendAgentResult<()> {
         // Check PostgreSQL connection
         self.postgres.health_check().await?;
-        
+
         // Check Redis connection
         self.redis.health_check().await?;
-        
+
         Ok(())
     }
 
     pub async fn close(&self) -> BackendAgentResult<()> {
         // Close PostgreSQL connections
         self.postgres.close().await?;
-        
+
         // Close Redis connections
         self.redis.close().await?;
-        
+
         Ok(())
     }
 }

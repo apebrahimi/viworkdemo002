@@ -1,7 +1,9 @@
 use crate::agent::AgentManager;
-use crate::api::auth::{get_claims, require_admin_role, require_operator_role, require_viewer_role};
+use crate::api::auth::{
+    get_claims, require_admin_role, require_operator_role, require_viewer_role,
+};
 use crate::command::CommandEngine;
-use crate::data::models::{CommandRecord, CommandStatus, AgentStatus, ActorInfo};
+use crate::data::models::{ActorInfo, AgentStatus, CommandRecord, CommandStatus};
 use crate::telemetry::TelemetryProcessor;
 use actix_web::{web, HttpRequest, HttpResponse, Result};
 use serde::{Deserialize, Serialize};
@@ -58,13 +60,10 @@ pub async fn list_agents(
     agent_manager: web::Data<Arc<AgentManager>>,
 ) -> Result<HttpResponse> {
     // Check authentication and authorization
-    let claims = get_claims(&req).ok_or_else(|| {
-        actix_web::error::ErrorUnauthorized("No authentication token")
-    })?;
+    let claims = get_claims(&req)
+        .ok_or_else(|| actix_web::error::ErrorUnauthorized("No authentication token"))?;
 
-    require_viewer_role(&claims).map_err(|e| {
-        actix_web::error::ErrorForbidden(e.to_string())
-    })?;
+    require_viewer_role(&claims).map_err(|e| actix_web::error::ErrorForbidden(e.to_string()))?;
 
     debug!("Listing agents for user: {}", claims.sub);
 
@@ -85,15 +84,12 @@ pub async fn get_agent(
     agent_manager: web::Data<Arc<AgentManager>>,
 ) -> Result<HttpResponse> {
     let agent_id = path.into_inner();
-    
-    // Check authentication and authorization
-    let claims = get_claims(&req).ok_or_else(|| {
-        actix_web::error::ErrorUnauthorized("No authentication token")
-    })?;
 
-    require_viewer_role(&claims).map_err(|e| {
-        actix_web::error::ErrorForbidden(e.to_string())
-    })?;
+    // Check authentication and authorization
+    let claims = get_claims(&req)
+        .ok_or_else(|| actix_web::error::ErrorUnauthorized("No authentication token"))?;
+
+    require_viewer_role(&claims).map_err(|e| actix_web::error::ErrorForbidden(e.to_string()))?;
 
     debug!("Getting agent {} for user: {}", agent_id, claims.sub);
 
@@ -111,15 +107,12 @@ pub async fn get_agents_by_site(
     agent_manager: web::Data<Arc<AgentManager>>,
 ) -> Result<HttpResponse> {
     let site = path.into_inner();
-    
-    // Check authentication and authorization
-    let claims = get_claims(&req).ok_or_else(|| {
-        actix_web::error::ErrorUnauthorized("No authentication token")
-    })?;
 
-    require_viewer_role(&claims).map_err(|e| {
-        actix_web::error::ErrorForbidden(e.to_string())
-    })?;
+    // Check authentication and authorization
+    let claims = get_claims(&req)
+        .ok_or_else(|| actix_web::error::ErrorUnauthorized("No authentication token"))?;
+
+    require_viewer_role(&claims).map_err(|e| actix_web::error::ErrorForbidden(e.to_string()))?;
 
     debug!("Getting agents for site {} for user: {}", site, claims.sub);
 
@@ -139,15 +132,15 @@ pub async fn create_command(
     command_engine: web::Data<Arc<CommandEngine>>,
 ) -> Result<HttpResponse> {
     // Check authentication and authorization
-    let claims = get_claims(&req).ok_or_else(|| {
-        actix_web::error::ErrorUnauthorized("No authentication token")
-    })?;
+    let claims = get_claims(&req)
+        .ok_or_else(|| actix_web::error::ErrorUnauthorized("No authentication token"))?;
 
-    require_operator_role(&claims).map_err(|e| {
-        actix_web::error::ErrorForbidden(e.to_string())
-    })?;
+    require_operator_role(&claims).map_err(|e| actix_web::error::ErrorForbidden(e.to_string()))?;
 
-    info!("Creating command '{}' for user: {}", payload.verb, claims.sub);
+    info!(
+        "Creating command '{}' for user: {}",
+        payload.verb, claims.sub
+    );
 
     // Create command record
     let correlation_id = Uuid::new_v4().to_string();
@@ -197,17 +190,17 @@ pub async fn get_command(
     command_engine: web::Data<Arc<CommandEngine>>,
 ) -> Result<HttpResponse> {
     let correlation_id = path.into_inner();
-    
+
     // Check authentication and authorization
-    let claims = get_claims(&req).ok_or_else(|| {
-        actix_web::error::ErrorUnauthorized("No authentication token")
-    })?;
+    let claims = get_claims(&req)
+        .ok_or_else(|| actix_web::error::ErrorUnauthorized("No authentication token"))?;
 
-    require_viewer_role(&claims).map_err(|e| {
-        actix_web::error::ErrorForbidden(e.to_string())
-    })?;
+    require_viewer_role(&claims).map_err(|e| actix_web::error::ErrorForbidden(e.to_string()))?;
 
-    debug!("Getting command {} for user: {}", correlation_id, claims.sub);
+    debug!(
+        "Getting command {} for user: {}",
+        correlation_id, claims.sub
+    );
 
     match command_engine.get_command(&correlation_id).await {
         Some(command) => Ok(HttpResponse::Ok().json(command)),
@@ -223,13 +216,10 @@ pub async fn list_commands(
     command_engine: web::Data<Arc<CommandEngine>>,
 ) -> Result<HttpResponse> {
     // Check authentication and authorization
-    let claims = get_claims(&req).ok_or_else(|| {
-        actix_web::error::ErrorUnauthorized("No authentication token")
-    })?;
+    let claims = get_claims(&req)
+        .ok_or_else(|| actix_web::error::ErrorUnauthorized("No authentication token"))?;
 
-    require_viewer_role(&claims).map_err(|e| {
-        actix_web::error::ErrorForbidden(e.to_string())
-    })?;
+    require_viewer_role(&claims).map_err(|e| actix_web::error::ErrorForbidden(e.to_string()))?;
 
     debug!("Listing commands for user: {}", claims.sub);
 
@@ -266,17 +256,17 @@ pub async fn retry_command(
     command_engine: web::Data<Arc<CommandEngine>>,
 ) -> Result<HttpResponse> {
     let correlation_id = path.into_inner();
-    
+
     // Check authentication and authorization
-    let claims = get_claims(&req).ok_or_else(|| {
-        actix_web::error::ErrorUnauthorized("No authentication token")
-    })?;
+    let claims = get_claims(&req)
+        .ok_or_else(|| actix_web::error::ErrorUnauthorized("No authentication token"))?;
 
-    require_operator_role(&claims).map_err(|e| {
-        actix_web::error::ErrorForbidden(e.to_string())
-    })?;
+    require_operator_role(&claims).map_err(|e| actix_web::error::ErrorForbidden(e.to_string()))?;
 
-    info!("Retrying command {} for user: {}", correlation_id, claims.sub);
+    info!(
+        "Retrying command {} for user: {}",
+        correlation_id, claims.sub
+    );
 
     match command_engine.retry_command(&correlation_id).await {
         Ok(_) => Ok(HttpResponse::Ok().json(serde_json::json!({
@@ -297,17 +287,17 @@ pub async fn cancel_command(
     command_engine: web::Data<Arc<CommandEngine>>,
 ) -> Result<HttpResponse> {
     let correlation_id = path.into_inner();
-    
+
     // Check authentication and authorization
-    let claims = get_claims(&req).ok_or_else(|| {
-        actix_web::error::ErrorUnauthorized("No authentication token")
-    })?;
+    let claims = get_claims(&req)
+        .ok_or_else(|| actix_web::error::ErrorUnauthorized("No authentication token"))?;
 
-    require_operator_role(&claims).map_err(|e| {
-        actix_web::error::ErrorForbidden(e.to_string())
-    })?;
+    require_operator_role(&claims).map_err(|e| actix_web::error::ErrorForbidden(e.to_string()))?;
 
-    info!("Cancelling command {} for user: {}", correlation_id, claims.sub);
+    info!(
+        "Cancelling command {} for user: {}",
+        correlation_id, claims.sub
+    );
 
     match command_engine.cancel_command(&correlation_id).await {
         Ok(_) => Ok(HttpResponse::Ok().json(serde_json::json!({
@@ -329,17 +319,17 @@ pub async fn get_agent_telemetry(
     telemetry_processor: web::Data<Arc<TelemetryProcessor>>,
 ) -> Result<HttpResponse> {
     let agent_id = path.into_inner();
-    
+
     // Check authentication and authorization
-    let claims = get_claims(&req).ok_or_else(|| {
-        actix_web::error::ErrorUnauthorized("No authentication token")
-    })?;
+    let claims = get_claims(&req)
+        .ok_or_else(|| actix_web::error::ErrorUnauthorized("No authentication token"))?;
 
-    require_viewer_role(&claims).map_err(|e| {
-        actix_web::error::ErrorForbidden(e.to_string())
-    })?;
+    require_viewer_role(&claims).map_err(|e| actix_web::error::ErrorForbidden(e.to_string()))?;
 
-    debug!("Getting telemetry for agent {} for user: {}", agent_id, claims.sub);
+    debug!(
+        "Getting telemetry for agent {} for user: {}",
+        agent_id, claims.sub
+    );
 
     match telemetry_processor.get_latest_telemetry(&agent_id).await {
         Ok(Some(telemetry)) => Ok(HttpResponse::Ok().json(telemetry)),
@@ -362,22 +352,28 @@ pub async fn get_agent_telemetry_history(
     telemetry_processor: web::Data<Arc<TelemetryProcessor>>,
 ) -> Result<HttpResponse> {
     let agent_id = path.into_inner();
-    
+
     // Check authentication and authorization
-    let claims = get_claims(&req).ok_or_else(|| {
-        actix_web::error::ErrorUnauthorized("No authentication token")
-    })?;
+    let claims = get_claims(&req)
+        .ok_or_else(|| actix_web::error::ErrorUnauthorized("No authentication token"))?;
 
-    require_viewer_role(&claims).map_err(|e| {
-        actix_web::error::ErrorForbidden(e.to_string())
-    })?;
+    require_viewer_role(&claims).map_err(|e| actix_web::error::ErrorForbidden(e.to_string()))?;
 
-    debug!("Getting telemetry history for agent {} for user: {}", agent_id, claims.sub);
+    debug!(
+        "Getting telemetry history for agent {} for user: {}",
+        agent_id, claims.sub
+    );
 
-    match telemetry_processor.get_telemetry_history(&agent_id, query.limit).await {
+    match telemetry_processor
+        .get_telemetry_history(&agent_id, query.limit)
+        .await
+    {
         Ok(telemetry_records) => Ok(HttpResponse::Ok().json(telemetry_records)),
         Err(e) => {
-            error!("Failed to get telemetry history for agent {}: {}", agent_id, e);
+            error!(
+                "Failed to get telemetry history for agent {}: {}",
+                agent_id, e
+            );
             Ok(HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Internal server error"
             })))
@@ -393,13 +389,10 @@ pub async fn get_statistics(
     telemetry_processor: web::Data<Arc<TelemetryProcessor>>,
 ) -> Result<HttpResponse> {
     // Check authentication and authorization
-    let claims = get_claims(&req).ok_or_else(|| {
-        actix_web::error::ErrorUnauthorized("No authentication token")
-    })?;
+    let claims = get_claims(&req)
+        .ok_or_else(|| actix_web::error::ErrorUnauthorized("No authentication token"))?;
 
-    require_viewer_role(&claims).map_err(|e| {
-        actix_web::error::ErrorForbidden(e.to_string())
-    })?;
+    require_viewer_role(&claims).map_err(|e| actix_web::error::ErrorForbidden(e.to_string()))?;
 
     debug!("Getting statistics for user: {}", claims.sub);
 
@@ -435,17 +428,17 @@ pub async fn update_agent_status(
     agent_manager: web::Data<Arc<AgentManager>>,
 ) -> Result<HttpResponse> {
     let (agent_id, status_str) = path.into_inner();
-    
+
     // Check authentication and authorization
-    let claims = get_claims(&req).ok_or_else(|| {
-        actix_web::error::ErrorUnauthorized("No authentication token")
-    })?;
+    let claims = get_claims(&req)
+        .ok_or_else(|| actix_web::error::ErrorUnauthorized("No authentication token"))?;
 
-    require_admin_role(&claims).map_err(|e| {
-        actix_web::error::ErrorForbidden(e.to_string())
-    })?;
+    require_admin_role(&claims).map_err(|e| actix_web::error::ErrorForbidden(e.to_string()))?;
 
-    info!("Updating agent {} status to {} for user: {}", agent_id, status_str, claims.sub);
+    info!(
+        "Updating agent {} status to {} for user: {}",
+        agent_id, status_str, claims.sub
+    );
 
     let status = match status_str.as_str() {
         "online" => AgentStatus::Online,

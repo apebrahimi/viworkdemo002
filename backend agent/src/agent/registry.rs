@@ -23,38 +23,56 @@ impl AgentRegistry {
     }
 
     /// Register a new agent connection
-    pub async fn register_agent(&self, agent_info: AgentInfo, connection_id: String) -> BackendAgentResult<()> {
+    pub async fn register_agent(
+        &self,
+        agent_info: AgentInfo,
+        connection_id: String,
+    ) -> BackendAgentResult<()> {
         let agent_id = agent_info.agent_id.clone();
-        
-        info!("Registering agent: {} (connection: {})", agent_id, connection_id);
-        
+
+        info!(
+            "Registering agent: {} (connection: {})",
+            agent_id, connection_id
+        );
+
         // Store agent information
         self.agents.insert(agent_id.clone(), agent_info);
-        
+
         // Map connection to agent
-        self.connections.insert(agent_id.clone(), connection_id.clone());
-        self.connection_agents.insert(connection_id, agent_id.clone());
-        
+        self.connections
+            .insert(agent_id.clone(), connection_id.clone());
+        self.connection_agents
+            .insert(connection_id, agent_id.clone());
+
         debug!("Agent {} registered successfully", agent_id);
         Ok(())
     }
 
     /// Unregister an agent connection
-    pub async fn unregister_agent(&self, connection_id: &str) -> BackendAgentResult<Option<String>> {
+    pub async fn unregister_agent(
+        &self,
+        connection_id: &str,
+    ) -> BackendAgentResult<Option<String>> {
         if let Some(agent_id) = self.connection_agents.remove(connection_id) {
             let agent_id = agent_id.1;
-            
-            info!("Unregistering agent: {} (connection: {})", agent_id, connection_id);
-            
+
+            info!(
+                "Unregistering agent: {} (connection: {})",
+                agent_id, connection_id
+            );
+
             // Remove from all maps
             self.agents.remove(&agent_id);
             self.connections.remove(&agent_id);
             self.connection_agents.remove(connection_id);
-            
+
             debug!("Agent {} unregistered successfully", agent_id);
             Ok(Some(agent_id))
         } else {
-            warn!("Attempted to unregister unknown connection: {}", connection_id);
+            warn!(
+                "Attempted to unregister unknown connection: {}",
+                connection_id
+            );
             Ok(None)
         }
     }
@@ -67,7 +85,9 @@ impl AgentRegistry {
     /// Get agent information by connection ID
     pub async fn get_agent_by_connection(&self, connection_id: &str) -> Option<AgentInfo> {
         if let Some(agent_id) = self.connection_agents.get(connection_id) {
-            self.agents.get(&agent_id.value().clone()).map(|entry| entry.clone())
+            self.agents
+                .get(&agent_id.value().clone())
+                .map(|entry| entry.clone())
         } else {
             None
         }
@@ -97,13 +117,19 @@ impl AgentRegistry {
     }
 
     /// Update agent status
-    pub async fn update_agent_status(&self, agent_id: &str, status: AgentStatus) -> BackendAgentResult<()> {
+    pub async fn update_agent_status(
+        &self,
+        agent_id: &str,
+        status: AgentStatus,
+    ) -> BackendAgentResult<()> {
         if let Some(mut agent) = self.agents.get_mut(agent_id) {
             agent.status = status.clone();
             debug!("Updated agent {} status to {:?}", agent_id, status);
             Ok(())
         } else {
-            Err(crate::error::BackendAgentError::AgentNotFound(agent_id.to_string()))
+            Err(crate::error::BackendAgentError::AgentNotFound(
+                agent_id.to_string(),
+            ))
         }
     }
 
@@ -114,7 +140,9 @@ impl AgentRegistry {
             debug!("Updated agent {} last seen timestamp", agent_id);
             Ok(())
         } else {
-            Err(crate::error::BackendAgentError::AgentNotFound(agent_id.to_string()))
+            Err(crate::error::BackendAgentError::AgentNotFound(
+                agent_id.to_string(),
+            ))
         }
     }
 
@@ -129,7 +157,9 @@ impl AgentRegistry {
 
     /// Get connection ID for an agent
     pub async fn get_connection_id(&self, agent_id: &str) -> Option<String> {
-        self.connections.get(agent_id).map(|entry| entry.value().clone())
+        self.connections
+            .get(agent_id)
+            .map(|entry| entry.value().clone())
     }
 
     /// Get total agent count
@@ -209,7 +239,8 @@ impl AgentRegistry {
     /// Get agent statistics
     pub async fn get_statistics(&self) -> AgentStatistics {
         let total = self.agents.len();
-        let online = self.agents
+        let online = self
+            .agents
             .iter()
             .filter(|entry| entry.status == AgentStatus::Online)
             .count();
@@ -231,33 +262,33 @@ impl AgentRegistry {
 
     async fn get_os_distribution(&self) -> std::collections::HashMap<String, usize> {
         let mut distribution = std::collections::HashMap::new();
-        
+
         for entry in self.agents.iter() {
             *distribution.entry(entry.os.clone()).or_insert(0) += 1;
         }
-        
+
         distribution
     }
 
     async fn get_site_distribution(&self) -> std::collections::HashMap<String, usize> {
         let mut distribution = std::collections::HashMap::new();
-        
+
         for entry in self.agents.iter() {
             *distribution.entry(entry.site.clone()).or_insert(0) += 1;
         }
-        
+
         distribution
     }
 
     async fn get_capability_distribution(&self) -> std::collections::HashMap<String, usize> {
         let mut distribution = std::collections::HashMap::new();
-        
+
         for entry in self.agents.iter() {
             for capability in &entry.capabilities {
                 *distribution.entry(capability.clone()).or_insert(0) += 1;
             }
         }
-        
+
         distribution
     }
 }

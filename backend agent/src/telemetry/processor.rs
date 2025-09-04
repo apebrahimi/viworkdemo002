@@ -1,11 +1,11 @@
 use crate::config::Config;
+use crate::data::models::{AgentInfo, NetworkStats, TelemetryMessage, TelemetryRecord};
 use crate::data::DataLayer;
-use crate::data::models::{TelemetryRecord, TelemetryMessage, AgentInfo, NetworkStats};
 use crate::error::BackendAgentResult;
-use crate::telemetry::{TelemetryStorage, TelemetryAnalytics};
+use crate::telemetry::{TelemetryAnalytics, TelemetryStorage};
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::{RwLock, mpsc};
+use tokio::sync::{mpsc, RwLock};
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
@@ -25,7 +25,7 @@ impl TelemetryProcessor {
 
         let storage = Arc::new(TelemetryStorage::new(data_layer.clone()));
         let analytics = Arc::new(TelemetryAnalytics::new(data_layer.clone()));
-        
+
         let (sender, receiver) = mpsc::unbounded_channel();
         let telemetry_queue = Arc::new(sender);
         let telemetry_receiver = Arc::new(RwLock::new(Some(receiver)));
@@ -72,8 +72,14 @@ impl TelemetryProcessor {
     }
 
     /// Process a telemetry message
-    pub async fn process_telemetry(&self, telemetry_msg: TelemetryMessage) -> BackendAgentResult<()> {
-        info!("Processing telemetry from agent: {}", telemetry_msg.agent_id);
+    pub async fn process_telemetry(
+        &self,
+        telemetry_msg: TelemetryMessage,
+    ) -> BackendAgentResult<()> {
+        info!(
+            "Processing telemetry from agent: {}",
+            telemetry_msg.agent_id
+        );
 
         // Convert telemetry message to record
         let telemetry_record = TelemetryRecord {
@@ -84,18 +90,26 @@ impl TelemetryProcessor {
             memory_usage: telemetry_msg.memory.clone(),
             disk_usage: telemetry_msg.disk.clone(),
             load_average: telemetry_msg.load_average.clone(),
-            container_count: telemetry_msg.containers.as_object().map(|o| o.len() as i32).unwrap_or(0),
+            container_count: telemetry_msg
+                .containers
+                .as_object()
+                .map(|o| o.len() as i32)
+                .unwrap_or(0),
             service_status: telemetry_msg.services.clone(),
-            network_stats: telemetry_msg.version.as_object().and_then(|v| v.get("network").cloned()).map(|n| {
-                // Convert the network info to NetworkStats if possible
-                serde_json::from_value(n).unwrap_or_else(|_| NetworkStats {
-                    bytes_sent: 0,
-                    bytes_received: 0,
-                    packets_sent: 0,
-                    packets_received: 0,
-                    connections_active: 0,
-                })
-            }),
+            network_stats: telemetry_msg
+                .version
+                .as_object()
+                .and_then(|v| v.get("network").cloned())
+                .map(|n| {
+                    // Convert the network info to NetworkStats if possible
+                    serde_json::from_value(n).unwrap_or_else(|_| NetworkStats {
+                        bytes_sent: 0,
+                        bytes_received: 0,
+                        packets_sent: 0,
+                        packets_received: 0,
+                        connections_active: 0,
+                    })
+                }),
             created_at: chrono::Utc::now(),
         };
 
@@ -105,16 +119,20 @@ impl TelemetryProcessor {
         // Process analytics
         self.analytics.process_telemetry(&telemetry_record).await?;
 
-        info!("Telemetry from agent {} processed successfully", telemetry_msg.agent_id);
+        info!(
+            "Telemetry from agent {} processed successfully",
+            telemetry_msg.agent_id
+        );
         Ok(())
     }
 
     /// Queue telemetry for processing
     pub async fn queue_telemetry(&self, telemetry_msg: TelemetryMessage) -> BackendAgentResult<()> {
         if let Err(e) = self.telemetry_queue.send(telemetry_msg) {
-            return Err(crate::error::BackendAgentError::Internal(
-                format!("Failed to queue telemetry: {}", e),
-            ));
+            return Err(crate::error::BackendAgentError::Internal(format!(
+                "Failed to queue telemetry: {}",
+                e
+            )));
         }
         Ok(())
     }
@@ -162,12 +180,19 @@ impl TelemetryProcessor {
     }
 
     /// Get latest telemetry for an agent
-    pub async fn get_latest_telemetry(&self, agent_id: &str) -> BackendAgentResult<Option<TelemetryRecord>> {
+    pub async fn get_latest_telemetry(
+        &self,
+        agent_id: &str,
+    ) -> BackendAgentResult<Option<TelemetryRecord>> {
         self.storage.get_latest_telemetry(agent_id).await
     }
 
     /// Get telemetry history for an agent
-    pub async fn get_telemetry_history(&self, agent_id: &str, limit: Option<usize>) -> BackendAgentResult<Vec<TelemetryRecord>> {
+    pub async fn get_telemetry_history(
+        &self,
+        agent_id: &str,
+        limit: Option<usize>,
+    ) -> BackendAgentResult<Vec<TelemetryRecord>> {
         self.storage.get_telemetry_history(agent_id, limit).await
     }
 
@@ -183,11 +208,12 @@ impl TelemetryProcessor {
             let storage = storage.clone();
             tokio::spawn(async move {
                 let mut interval = tokio::time::interval(Duration::from_secs(3600)); // Every hour
-                
+
                 loop {
                     interval.tick().await;
-                    
-                    if let Err(e) = storage.cleanup_old_telemetry(7 * 24).await { // 7 days
+
+                    if let Err(e) = storage.cleanup_old_telemetry(7 * 24).await {
+                        // 7 days
                         error!("Telemetry cleanup failed: {}", e);
                     }
                 }
@@ -198,10 +224,10 @@ impl TelemetryProcessor {
         let analytics_task = {
             tokio::spawn(async move {
                 let mut interval = tokio::time::interval(Duration::from_secs(300)); // Every 5 minutes
-                
+
                 loop {
                     interval.tick().await;
-                    
+
                     if let Err(e) = analytics.run_analytics().await {
                         error!("Analytics processing failed: {}", e);
                     }

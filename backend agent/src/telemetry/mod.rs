@@ -1,7 +1,7 @@
+pub mod analytics;
 pub mod processor;
 pub mod storage;
-pub mod analytics;
 
+pub use analytics::TelemetryAnalytics;
 pub use processor::TelemetryProcessor;
 pub use storage::TelemetryStorage;
-pub use analytics::TelemetryAnalytics;

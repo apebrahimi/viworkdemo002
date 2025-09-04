@@ -1,4 +1,4 @@
-use crate::data::models::{CommandRecord, CommandResult, CommandStatus, CommandPriority};
+use crate::data::models::{CommandPriority, CommandRecord, CommandResult, CommandStatus};
 use crate::error::BackendAgentResult;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -20,7 +20,10 @@ impl CommandExecutor {
 
     /// Validate a command before execution
     pub async fn validate_command(&self, command: &CommandRecord) -> BackendAgentResult<()> {
-        info!("Validating command: {} ({})", command.correlation_id, command.verb);
+        info!(
+            "Validating command: {} ({})",
+            command.correlation_id, command.verb
+        );
 
         // Basic validation
         if command.verb.is_empty() {
@@ -68,16 +71,17 @@ impl CommandExecutor {
             "docker_compose_down" => self.validate_docker_compose_down_command(command).await,
             "docker_compose_ps" => self.validate_docker_compose_ps_command(command).await,
             "docker_compose_logs" => self.validate_docker_compose_logs_command(command).await,
-            _ => Err(crate::error::BackendAgentError::Validation(
-                format!("Unknown command verb: {}", command.verb),
-            )),
+            _ => Err(crate::error::BackendAgentError::Validation(format!(
+                "Unknown command verb: {}",
+                command.verb
+            ))),
         }
     }
 
     /// Validate exec command
     async fn validate_exec_command(&self, command: &CommandRecord) -> BackendAgentResult<()> {
         let args = &command.args;
-        
+
         if let Some(cmd) = args.get("command") {
             if !cmd.is_string() || cmd.as_str().unwrap().is_empty() {
                 return Err(crate::error::BackendAgentError::Validation(
@@ -100,13 +104,17 @@ impl CommandExecutor {
     }
 
     /// Validate docker_inspect command
-    async fn validate_docker_inspect_command(&self, command: &CommandRecord) -> BackendAgentResult<()> {
+    async fn validate_docker_inspect_command(
+        &self,
+        command: &CommandRecord,
+    ) -> BackendAgentResult<()> {
         let args = &command.args;
-        
+
         if let Some(container_id) = args.get("container_id") {
             if !container_id.is_string() || container_id.as_str().unwrap().is_empty() {
                 return Err(crate::error::BackendAgentError::Validation(
-                    "Docker inspect command must have a non-empty 'container_id' string".to_string(),
+                    "Docker inspect command must have a non-empty 'container_id' string"
+                        .to_string(),
                 ));
             }
         } else {
@@ -119,9 +127,12 @@ impl CommandExecutor {
     }
 
     /// Validate docker_logs command
-    async fn validate_docker_logs_command(&self, command: &CommandRecord) -> BackendAgentResult<()> {
+    async fn validate_docker_logs_command(
+        &self,
+        command: &CommandRecord,
+    ) -> BackendAgentResult<()> {
         let args = &command.args;
-        
+
         if let Some(container_id) = args.get("container_id") {
             if !container_id.is_string() || container_id.as_str().unwrap().is_empty() {
                 return Err(crate::error::BackendAgentError::Validation(
@@ -147,9 +158,12 @@ impl CommandExecutor {
     }
 
     /// Validate docker_stats command
-    async fn validate_docker_stats_command(&self, command: &CommandRecord) -> BackendAgentResult<()> {
+    async fn validate_docker_stats_command(
+        &self,
+        command: &CommandRecord,
+    ) -> BackendAgentResult<()> {
         let args = &command.args;
-        
+
         // Optional container_id parameter
         if let Some(container_id) = args.get("container_id") {
             if !container_id.is_string() || container_id.as_str().unwrap().is_empty() {
@@ -165,7 +179,7 @@ impl CommandExecutor {
     /// Validate docker_top command
     async fn validate_docker_top_command(&self, command: &CommandRecord) -> BackendAgentResult<()> {
         let args = &command.args;
-        
+
         if let Some(container_id) = args.get("container_id") {
             if !container_id.is_string() || container_id.as_str().unwrap().is_empty() {
                 return Err(crate::error::BackendAgentError::Validation(
@@ -182,9 +196,12 @@ impl CommandExecutor {
     }
 
     /// Validate docker_exec command
-    async fn validate_docker_exec_command(&self, command: &CommandRecord) -> BackendAgentResult<()> {
+    async fn validate_docker_exec_command(
+        &self,
+        command: &CommandRecord,
+    ) -> BackendAgentResult<()> {
         let args = &command.args;
-        
+
         if let Some(container_id) = args.get("container_id") {
             if !container_id.is_string() || container_id.as_str().unwrap().is_empty() {
                 return Err(crate::error::BackendAgentError::Validation(
@@ -215,7 +232,7 @@ impl CommandExecutor {
     /// Validate docker_run command
     async fn validate_docker_run_command(&self, command: &CommandRecord) -> BackendAgentResult<()> {
         let args = &command.args;
-        
+
         if let Some(image) = args.get("image") {
             if !image.is_string() || image.as_str().unwrap().is_empty() {
                 return Err(crate::error::BackendAgentError::Validation(
@@ -241,9 +258,12 @@ impl CommandExecutor {
     }
 
     /// Validate docker_stop command
-    async fn validate_docker_stop_command(&self, command: &CommandRecord) -> BackendAgentResult<()> {
+    async fn validate_docker_stop_command(
+        &self,
+        command: &CommandRecord,
+    ) -> BackendAgentResult<()> {
         let args = &command.args;
-        
+
         if let Some(container_id) = args.get("container_id") {
             if !container_id.is_string() || container_id.as_str().unwrap().is_empty() {
                 return Err(crate::error::BackendAgentError::Validation(
@@ -262,7 +282,7 @@ impl CommandExecutor {
     /// Validate docker_rm command
     async fn validate_docker_rm_command(&self, command: &CommandRecord) -> BackendAgentResult<()> {
         let args = &command.args;
-        
+
         if let Some(container_id) = args.get("container_id") {
             if !container_id.is_string() || container_id.as_str().unwrap().is_empty() {
                 return Err(crate::error::BackendAgentError::Validation(
@@ -279,9 +299,12 @@ impl CommandExecutor {
     }
 
     /// Validate docker_pull command
-    async fn validate_docker_pull_command(&self, command: &CommandRecord) -> BackendAgentResult<()> {
+    async fn validate_docker_pull_command(
+        &self,
+        command: &CommandRecord,
+    ) -> BackendAgentResult<()> {
         let args = &command.args;
-        
+
         if let Some(image) = args.get("image") {
             if !image.is_string() || image.as_str().unwrap().is_empty() {
                 return Err(crate::error::BackendAgentError::Validation(
@@ -298,9 +321,12 @@ impl CommandExecutor {
     }
 
     /// Validate docker_build command
-    async fn validate_docker_build_command(&self, command: &CommandRecord) -> BackendAgentResult<()> {
+    async fn validate_docker_build_command(
+        &self,
+        command: &CommandRecord,
+    ) -> BackendAgentResult<()> {
         let args = &command.args;
-        
+
         if let Some(context) = args.get("context") {
             if !context.is_string() || context.as_str().unwrap().is_empty() {
                 return Err(crate::error::BackendAgentError::Validation(
@@ -326,13 +352,17 @@ impl CommandExecutor {
     }
 
     /// Validate docker_compose_up command
-    async fn validate_docker_compose_up_command(&self, command: &CommandRecord) -> BackendAgentResult<()> {
+    async fn validate_docker_compose_up_command(
+        &self,
+        command: &CommandRecord,
+    ) -> BackendAgentResult<()> {
         let args = &command.args;
-        
+
         if let Some(compose_file) = args.get("compose_file") {
             if !compose_file.is_string() || compose_file.as_str().unwrap().is_empty() {
                 return Err(crate::error::BackendAgentError::Validation(
-                    "Docker compose up command must have a non-empty 'compose_file' string".to_string(),
+                    "Docker compose up command must have a non-empty 'compose_file' string"
+                        .to_string(),
                 ));
             }
         } else {
@@ -345,13 +375,17 @@ impl CommandExecutor {
     }
 
     /// Validate docker_compose_down command
-    async fn validate_docker_compose_down_command(&self, command: &CommandRecord) -> BackendAgentResult<()> {
+    async fn validate_docker_compose_down_command(
+        &self,
+        command: &CommandRecord,
+    ) -> BackendAgentResult<()> {
         let args = &command.args;
-        
+
         if let Some(compose_file) = args.get("compose_file") {
             if !compose_file.is_string() || compose_file.as_str().unwrap().is_empty() {
                 return Err(crate::error::BackendAgentError::Validation(
-                    "Docker compose down command must have a non-empty 'compose_file' string".to_string(),
+                    "Docker compose down command must have a non-empty 'compose_file' string"
+                        .to_string(),
                 ));
             }
         } else {
@@ -364,13 +398,17 @@ impl CommandExecutor {
     }
 
     /// Validate docker_compose_ps command
-    async fn validate_docker_compose_ps_command(&self, command: &CommandRecord) -> BackendAgentResult<()> {
+    async fn validate_docker_compose_ps_command(
+        &self,
+        command: &CommandRecord,
+    ) -> BackendAgentResult<()> {
         let args = &command.args;
-        
+
         if let Some(compose_file) = args.get("compose_file") {
             if !compose_file.is_string() || compose_file.as_str().unwrap().is_empty() {
                 return Err(crate::error::BackendAgentError::Validation(
-                    "Docker compose ps command must have a non-empty 'compose_file' string".to_string(),
+                    "Docker compose ps command must have a non-empty 'compose_file' string"
+                        .to_string(),
                 ));
             }
         } else {
@@ -383,13 +421,17 @@ impl CommandExecutor {
     }
 
     /// Validate docker_compose_logs command
-    async fn validate_docker_compose_logs_command(&self, command: &CommandRecord) -> BackendAgentResult<()> {
+    async fn validate_docker_compose_logs_command(
+        &self,
+        command: &CommandRecord,
+    ) -> BackendAgentResult<()> {
         let args = &command.args;
-        
+
         if let Some(compose_file) = args.get("compose_file") {
             if !compose_file.is_string() || compose_file.as_str().unwrap().is_empty() {
                 return Err(crate::error::BackendAgentError::Validation(
-                    "Docker compose logs command must have a non-empty 'compose_file' string".to_string(),
+                    "Docker compose logs command must have a non-empty 'compose_file' string"
+                        .to_string(),
                 ));
             }
         } else {
@@ -411,8 +453,14 @@ impl CommandExecutor {
     }
 
     /// Execute a command (this is a placeholder - actual execution happens on OS agents)
-    pub async fn execute_command(&self, command: &CommandRecord) -> BackendAgentResult<CommandResult> {
-        info!("Executing command: {} ({})", command.correlation_id, command.verb);
+    pub async fn execute_command(
+        &self,
+        command: &CommandRecord,
+    ) -> BackendAgentResult<CommandResult> {
+        info!(
+            "Executing command: {} ({})",
+            command.correlation_id, command.verb
+        );
 
         // Validate command first
         self.validate_command(command).await?;
@@ -427,14 +475,20 @@ impl CommandExecutor {
             status: crate::data::models::CommandExecutionStatus::Success,
             return_code: 0,
             duration_ms: 0,
-            stdout: format!("Command '{}' would be executed on {} agent(s)", 
-                command.verb, command.agent_targets.len()),
+            stdout: format!(
+                "Command '{}' would be executed on {} agent(s)",
+                command.verb,
+                command.agent_targets.len()
+            ),
             stderr_hash: "".to_string(),
             error_code: None,
             timestamp: chrono::Utc::now(),
         };
 
-        info!("Command {} execution completed successfully", command.correlation_id);
+        info!(
+            "Command {} execution completed successfully",
+            command.correlation_id
+        );
         Ok(result)
     }
 

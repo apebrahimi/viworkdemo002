@@ -1,25 +1,26 @@
-use crate::agent::{AgentConnection, AgentRegistry};
 use crate::agent::connection::AgentConnectionId;
-use crate::config::Config;
-use crate::data::DataLayer;
-use crate::data::models::{AgentInfo, AgentStatus, WebSocketMessage, CommandMessage};
-use crate::error::BackendAgentResult;
+use crate::agent::{AgentConnection, AgentRegistry};
 use crate::command::CommandEngine;
+use crate::config::Config;
+use crate::data::models::{AgentInfo, AgentStatus, CommandMessage, WebSocketMessage};
+use crate::data::DataLayer;
+use crate::error::BackendAgentResult;
 use crate::telemetry::TelemetryProcessor;
-use actix_web::{web, App, HttpServer, middleware::Logger};
+use actix_web::{middleware::Logger, web, App, HttpServer};
 use dashmap::DashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::net::TcpListener;
 use tokio::sync::RwLock;
-use tokio_tungstenite::{accept_async, WebSocketStream};
 use tokio_tungstenite::tungstenite::handshake::server::Callback;
+use tokio_tungstenite::{accept_async, WebSocketStream};
 use tracing::{debug, error, info, warn};
 
 pub struct AgentManager {
     pub registry: Arc<AgentRegistry>,
-    pub connections: Arc<DashMap<AgentConnectionId, Arc<RwLock<AgentConnection<tokio::net::TcpStream>>>>>,
+    pub connections:
+        Arc<DashMap<AgentConnectionId, Arc<RwLock<AgentConnection<tokio::net::TcpStream>>>>>,
     pub config: Config,
     pub is_running: Arc<RwLock<bool>>,
     pub listener: Option<TcpListener>,
@@ -47,21 +48,26 @@ impl AgentManager {
 
     /// Start the WebSocket server for agent connections
     pub async fn start(&mut self) -> BackendAgentResult<()> {
-        let bind_address = format!("{}:{}", 
-            self.config.agent_management.bind_address, 
-            self.config.agent_management.port
+        let bind_address = format!(
+            "{}:{}",
+            self.config.agent_management.bind_address, self.config.agent_management.port
         );
 
-        info!("Starting Agent Manager WebSocket server on {}", bind_address);
+        info!(
+            "Starting Agent Manager WebSocket server on {}",
+            bind_address
+        );
 
-        let listener = TcpListener::bind(&bind_address).await
-            .map_err(|e| {
-                error!("Failed to bind WebSocket server: {}", e);
-                crate::error::BackendAgentError::Internal(format!("Failed to bind WebSocket server: {}", e))
-            })?;
+        let listener = TcpListener::bind(&bind_address).await.map_err(|e| {
+            error!("Failed to bind WebSocket server: {}", e);
+            crate::error::BackendAgentError::Internal(format!(
+                "Failed to bind WebSocket server: {}",
+                e
+            ))
+        })?;
 
         self.listener = Some(listener);
-        
+
         {
             let mut running = self.is_running.write().await;
             *running = true;
@@ -94,10 +100,9 @@ impl AgentManager {
 
     /// Run the main server loop
     pub async fn run_server_loop(&self) -> BackendAgentResult<()> {
-        let listener = self.listener.as_ref()
-            .ok_or_else(|| crate::error::BackendAgentError::Internal(
-                "WebSocket server not started".to_string()
-            ))?;
+        let listener = self.listener.as_ref().ok_or_else(|| {
+            crate::error::BackendAgentError::Internal("WebSocket server not started".to_string())
+        })?;
 
         info!("Agent Manager server loop started, accepting connections...");
 
@@ -105,14 +110,17 @@ impl AgentManager {
             match listener.accept().await {
                 Ok((stream, addr)) => {
                     info!("New connection from {}", addr);
-                    
+
                     // Spawn a task to handle the connection
                     let registry = self.registry.clone();
                     let connections = self.connections.clone();
                     let config = self.config.clone();
-                    
+
                     tokio::spawn(async move {
-                        if let Err(e) = Self::handle_new_connection(stream, addr, registry, connections, config).await {
+                        if let Err(e) =
+                            Self::handle_new_connection(stream, addr, registry, connections, config)
+                                .await
+                        {
                             error!("Failed to handle connection from {}: {}", addr, e);
                         }
                     });
@@ -135,15 +143,16 @@ impl AgentManager {
         stream: tokio::net::TcpStream,
         addr: std::net::SocketAddr,
         registry: Arc<AgentRegistry>,
-        connections: Arc<DashMap<AgentConnectionId, Arc<RwLock<AgentConnection<tokio::net::TcpStream>>>>>,
+        connections: Arc<
+            DashMap<AgentConnectionId, Arc<RwLock<AgentConnection<tokio::net::TcpStream>>>>,
+        >,
         config: Config,
     ) -> BackendAgentResult<()> {
         // Accept the WebSocket connection
-        let ws_stream = accept_async(stream).await
-            .map_err(|e| {
-                error!("Failed to accept WebSocket connection from {}: {}", addr, e);
-                crate::error::BackendAgentError::WebSocket(format!("WebSocket handshake failed: {}", e))
-            })?;
+        let ws_stream = accept_async(stream).await.map_err(|e| {
+            error!("Failed to accept WebSocket connection from {}: {}", addr, e);
+            crate::error::BackendAgentError::WebSocket(format!("WebSocket handshake failed: {}", e))
+        })?;
 
         info!("WebSocket connection established from {}", addr);
 
@@ -157,7 +166,7 @@ impl AgentManager {
         // Handle the connection
         if let Some(conn) = connections.get(&connection_id) {
             let mut conn = conn.write().await;
-            
+
             // Handle the connection lifecycle
             if let Err(e) = conn.handle_connection().await {
                 error!("Connection handler failed for {}: {}", connection_id, e);
@@ -178,27 +187,38 @@ impl AgentManager {
         command: CommandMessage,
     ) -> BackendAgentResult<()> {
         // Get agent info
-        let agent_info = self.registry.get_agent(agent_id).await
-            .ok_or_else(|| crate::error::BackendAgentError::AgentNotFound(agent_id.to_string()))?;
+        let agent_info =
+            self.registry.get_agent(agent_id).await.ok_or_else(|| {
+                crate::error::BackendAgentError::AgentNotFound(agent_id.to_string())
+            })?;
 
         // Check if agent is online
         if !self.registry.is_agent_online(agent_id).await {
-            return Err(crate::error::BackendAgentError::Connection(
-                format!("Agent {} is not online", agent_id),
-            ));
+            return Err(crate::error::BackendAgentError::Connection(format!(
+                "Agent {} is not online",
+                agent_id
+            )));
         }
 
         // Get connection ID
-        let connection_id = self.registry.get_connection_id(agent_id).await
-            .ok_or_else(|| crate::error::BackendAgentError::Connection(
-                format!("No active connection for agent {}", agent_id),
-            ))?;
+        let connection_id = self
+            .registry
+            .get_connection_id(agent_id)
+            .await
+            .ok_or_else(|| {
+                crate::error::BackendAgentError::Connection(format!(
+                    "No active connection for agent {}",
+                    agent_id
+                ))
+            })?;
 
         // Get connection
-        let connection = self.connections.get(&connection_id)
-            .ok_or_else(|| crate::error::BackendAgentError::Connection(
-                format!("Connection {} not found", connection_id),
-            ))?;
+        let connection = self.connections.get(&connection_id).ok_or_else(|| {
+            crate::error::BackendAgentError::Connection(format!(
+                "Connection {} not found",
+                connection_id
+            ))
+        })?;
 
         // Send command
         let message = WebSocketMessage {
@@ -210,7 +230,10 @@ impl AgentManager {
         let conn = connection.read().await;
         conn.send_message(message).await?;
 
-        info!("Command sent to agent {} via connection {}", agent_id, connection_id);
+        info!(
+            "Command sent to agent {} via connection {}",
+            agent_id, connection_id
+        );
         Ok(())
     }
 
@@ -234,34 +257,53 @@ impl AgentManager {
         }
 
         if !failed_agents.is_empty() {
-            warn!("Failed to send command to {} agents: {:?}", failed_agents.len(), failed_agents);
+            warn!(
+                "Failed to send command to {} agents: {:?}",
+                failed_agents.len(),
+                failed_agents
+            );
         }
 
-        info!("Command sent to {} agents successfully, {} failed", successful_agents.len(), failed_agents.len());
+        info!(
+            "Command sent to {} agents successfully, {} failed",
+            successful_agents.len(),
+            failed_agents.len()
+        );
         Ok(successful_agents)
     }
 
     /// Send a command to all agents
-    pub async fn send_command_to_all_agents(&self, command: CommandMessage) -> BackendAgentResult<Vec<String>> {
+    pub async fn send_command_to_all_agents(
+        &self,
+        command: CommandMessage,
+    ) -> BackendAgentResult<Vec<String>> {
         let all_agents = self.registry.list_agents().await;
         let agent_ids: Vec<String> = all_agents.iter().map(|a| a.agent_id.clone()).collect();
-        
+
         self.send_command_to_agents(&agent_ids, command).await
     }
 
     /// Send a command to agents by site
-    pub async fn send_command_to_site(&self, site: &str, command: CommandMessage) -> BackendAgentResult<Vec<String>> {
+    pub async fn send_command_to_site(
+        &self,
+        site: &str,
+        command: CommandMessage,
+    ) -> BackendAgentResult<Vec<String>> {
         let site_agents = self.registry.get_agents_by_site(site).await;
         let agent_ids: Vec<String> = site_agents.iter().map(|a| a.agent_id.clone()).collect();
-        
+
         self.send_command_to_agents(&agent_ids, command).await
     }
 
     /// Send a command to agents with specific capability
-    pub async fn send_command_to_capability(&self, capability: &str, command: CommandMessage) -> BackendAgentResult<Vec<String>> {
+    pub async fn send_command_to_capability(
+        &self,
+        capability: &str,
+        command: CommandMessage,
+    ) -> BackendAgentResult<Vec<String>> {
         let capable_agents = self.registry.get_agents_with_capability(capability).await;
         let agent_ids: Vec<String> = capable_agents.iter().map(|a| a.agent_id.clone()).collect();
-        
+
         self.send_command_to_agents(&agent_ids, command).await
     }
 
@@ -291,7 +333,11 @@ impl AgentManager {
     }
 
     /// Update agent status
-    pub async fn update_agent_status(&self, agent_id: &str, status: AgentStatus) -> BackendAgentResult<()> {
+    pub async fn update_agent_status(
+        &self,
+        agent_id: &str,
+        status: AgentStatus,
+    ) -> BackendAgentResult<()> {
         self.registry.update_agent_status(agent_id, status).await
     }
 
@@ -325,10 +371,10 @@ impl AgentManager {
         if let Some(connection) = self.connections.get(connection_id) {
             let mut conn = connection.write().await;
             conn.close().await?;
-            
+
             // Remove from connections map
             self.connections.remove(connection_id);
-            
+
             info!("Connection {} closed", connection_id);
         }
 
@@ -339,8 +385,12 @@ impl AgentManager {
     async fn close_all_connections(&self) -> BackendAgentResult<()> {
         info!("Closing all agent connections...");
 
-        let connection_ids: Vec<String> = self.connections.iter().map(|entry| entry.key().clone()).collect();
-        
+        let connection_ids: Vec<String> = self
+            .connections
+            .iter()
+            .map(|entry| entry.key().clone())
+            .collect();
+
         for connection_id in connection_ids {
             if let Err(e) = self.close_connection(&connection_id).await {
                 error!("Failed to close connection {}: {}", connection_id, e);
@@ -364,13 +414,15 @@ impl AgentManager {
             let registry = registry.clone();
             let connections = connections.clone();
             let config = config.clone();
-            
+
             tokio::spawn(async move {
-                let mut interval = tokio::time::interval(Duration::from_secs(config.agent_management.heartbeat_interval));
-                
+                let mut interval = tokio::time::interval(Duration::from_secs(
+                    config.agent_management.heartbeat_interval,
+                ));
+
                 loop {
                     interval.tick().await;
-                    
+
                     if let Err(e) = Self::run_health_check(&registry, &connections, &config).await {
                         error!("Health check failed: {}", e);
                     }
@@ -382,14 +434,15 @@ impl AgentManager {
         let cleanup_task = {
             let registry = registry.clone();
             let config = config.clone();
-            
+
             tokio::spawn(async move {
                 let mut interval = tokio::time::interval(Duration::from_secs(300)); // Every 5 minutes
-                
+
                 loop {
                     interval.tick().await;
-                    
-                    if let Err(e) = registry.cleanup_stale_agents(30).await { // 30 minutes threshold
+
+                    if let Err(e) = registry.cleanup_stale_agents(30).await {
+                        // 30 minutes threshold
                         error!("Cleanup failed: {}", e);
                     }
                 }
@@ -412,7 +465,9 @@ impl AgentManager {
     /// Run health check on all connections
     async fn run_health_check(
         registry: &AgentRegistry,
-        connections: &Arc<DashMap<AgentConnectionId, Arc<RwLock<AgentConnection<tokio::net::TcpStream>>>>>,
+        connections: &Arc<
+            DashMap<AgentConnectionId, Arc<RwLock<AgentConnection<tokio::net::TcpStream>>>>,
+        >,
         config: &Config,
     ) -> BackendAgentResult<()> {
         let threshold = config.agent_management.connection_timeout;
@@ -423,16 +478,22 @@ impl AgentManager {
             let connection = entry.value();
 
             let conn = connection.read().await;
-            
+
             // Check if connection is stale
             if conn.is_stale(threshold.try_into().unwrap()).await {
                 warn!("Connection {} is stale, marking for removal", connection_id);
                 to_remove.push(connection_id.clone());
-                
+
                 // Update agent status to offline
                 if let Some(agent_info) = conn.get_agent_info().await {
-                    if let Err(e) = registry.update_agent_status(&agent_info.agent_id, AgentStatus::Offline).await {
-                        error!("Failed to update agent {} status: {}", agent_info.agent_id, e);
+                    if let Err(e) = registry
+                        .update_agent_status(&agent_info.agent_id, AgentStatus::Offline)
+                        .await
+                    {
+                        error!(
+                            "Failed to update agent {} status: {}",
+                            agent_info.agent_id, e
+                        );
                     }
                 }
             }
