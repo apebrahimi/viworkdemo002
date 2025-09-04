@@ -1,0 +1,58 @@
+[server]
+bind_address = "0.0.0.0"
+port = 8080
+workers = 4
+max_connections = 1000
+request_timeout = 30
+cors_origins = ["*"]
+
+[database]
+url = "postgresql://viworks:viworks@localhost/viworks"
+max_connections = 10
+min_connections = 2
+connect_timeout = 10
+idle_timeout = 300
+max_lifetime = 3600
+
+[redis]
+url = "redis://localhost:6379"
+pool_size = 10
+connection_timeout = 5
+read_timeout = 3
+write_timeout = 3
+
+[security]
+jwt_secret = "change-me-in-production"
+jwt_expiration = 3600
+backend_private_key_path = "/etc/viworks/backend.key"
+backend_certificate_path = "/etc/viworks/backend.crt"
+allowed_origins = ["*"]
+rate_limit_requests = 100
+rate_limit_window = 60
+
+[agent_management]
+max_agent_connections = 100
+heartbeat_interval = 30
+connection_timeout = 60
+max_reconnect_attempts = 5
+reconnect_backoff_ms = 1000
+
+[command]
+max_concurrent_commands = 50
+command_timeout = 60
+max_command_queue_size = 1000
+retry_attempts = 3
+retry_delay_ms = 1000
+
+[telemetry]
+collection_interval = 30
+retention_days = 30
+batch_size = 100
+flush_interval = 5
+
+[logging]
+level = "info"
+format = "json"
+output = "stdout"
+max_file_size = 104857600
+max_files = 10
