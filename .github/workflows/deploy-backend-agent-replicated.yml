@@ -1,0 +1,281 @@
+name: Deploy Backend Agent (Replicated Build Process)
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'backend agent/**'
+      - '.github/workflows/deploy-backend-agent-replicated.yml'
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    name: Test Backend Agent
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        components: rustfmt, clippy
+    
+    - name: Cache cargo registry
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          backend agent/target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-
+    
+    - name: Test Backend Agent
+      run: |
+        cd "backend agent"
+        cargo test --verbose
+        cargo clippy -- -D warnings
+        cargo fmt -- --check
+
+  build:
+    name: Build Backend Agent (Replicated Process)
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Create Build Container (Replicate Server Process)
+      run: |
+        # Create the exact same build container as used on server
+        docker run -d --name viworks-build-temp debian:latest tail -f /dev/null
+        
+        # Wait for container to be ready
+        sleep 5
+        
+        # Verify container is running
+        docker ps | grep viworks-build-temp
+    
+    - name: Package Source Code (Replicate Server Process)
+      run: |
+        # Package source code exactly as done on server
+        cd "backend agent"
+        tar -czf ../backend-agent-source.tar.gz .
+        
+        # Show package info
+        ls -la ../backend-agent-source.tar.gz
+        echo "Source package created: $(du -h ../backend-agent-source.tar.gz | cut -f1)"
+    
+    - name: Copy Source to Build Container
+      run: |
+        # Copy source code to build container (replicate server process)
+        docker cp backend-agent-source.tar.gz viworks-build-temp:/tmp/
+        
+        # Verify copy
+        docker exec viworks-build-temp ls -la /tmp/backend-agent-source.tar.gz
+    
+    - name: Build Inside Container (Exact Server Process)
+      run: |
+        # Build inside container using exact same process as server
+        docker exec viworks-build-temp bash -c "
+          set -e
+          echo '=== Starting Build Process (Replicating Server) ==='
+          
+          # Extract source code
+          cd /tmp
+          tar -xzf backend-agent-source.tar.gz
+          cd backend-agent/
+          
+          # Install Rust (exact same as server)
+          echo 'Installing Rust...'
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+          source ~/.cargo/env
+          
+          # Show Rust version
+          rustc --version
+          cargo --version
+          
+          # Install system dependencies (exact same as server)
+          echo 'Installing system dependencies...'
+          apt-get update && apt-get install -y build-essential pkg-config libssl-dev
+          
+          # Build the binary (exact same as server)
+          echo 'Building binary...'
+          cargo build --release
+          
+          # Check if build was successful
+          if [ -f 'target/release/viworks-backend-agent' ]; then
+            echo 'Build successful!'
+            ls -la target/release/viworks-backend-agent
+            file target/release/viworks-backend-agent
+            
+            # Get binary size
+            BINARY_SIZE=\$(stat -c%s target/release/viworks-backend-agent)
+            echo \"Binary size: \$BINARY_SIZE bytes\"
+            
+            # Copy binary out
+            cp target/release/viworks-backend-agent /tmp/viworks-backend-agent-built
+            echo 'Binary ready at /tmp/viworks-backend-agent-built'
+          else
+            echo 'Build failed!'
+            exit 1
+          fi
+        "
+    
+    - name: Extract Built Binary
+      run: |
+        # Copy binary from build container
+        docker cp viworks-build-temp:/tmp/viworks-backend-agent-built ./viworks-backend-agent-built
+        
+        # Verify binary
+        ls -la viworks-backend-agent-built
+        file viworks-backend-agent-built
+        
+        # Get binary size
+        BINARY_SIZE=$(stat -c%s viworks-backend-agent-built)
+        echo "Built binary size: $BINARY_SIZE bytes"
+        
+        # Check if size is in expected range (6-8MB like server)
+        if [ $BINARY_SIZE -lt 6000000 ] || [ $BINARY_SIZE -gt 8000000 ]; then
+          echo "WARNING: Binary size $BINARY_SIZE is outside expected range (6-8MB)"
+          echo "This might indicate a different build environment"
+        else
+          echo "✅ Binary size is in expected range"
+        fi
+    
+    - name: Clean Up Build Container
+      if: always()
+      run: |
+        # Clean up build container
+        docker rm -f viworks-build-temp || true
+    
+    - name: Upload Built Binary
+      uses: actions/upload-artifact@v3
+      with:
+        name: viworks-backend-agent-built
+        path: viworks-backend-agent-built
+        retention-days: 1
+
+  deploy:
+    name: Deploy Backend Agent
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Download Built Binary
+      uses: actions/download-artifact@v3
+      with:
+        name: viworks-backend-agent-built
+        path: ./
+    
+    - name: Verify Binary
+      run: |
+        ls -la viworks-backend-agent-built
+        file viworks-backend-agent-built
+        
+        # Get binary size
+        BINARY_SIZE=$(stat -c%s viworks-backend-agent-built)
+        echo "Deploying binary size: $BINARY_SIZE bytes"
+        
+        # Verify binary is executable
+        chmod +x viworks-backend-agent-built
+    
+    - name: Copy Binary to Server
+      uses: appleboy/scp-action@v0.1.4
+      with:
+        host: ${{ secrets.DIGITALOCEAN_HOST }}
+        username: ${{ secrets.DIGITALOCEAN_USERNAME }}
+        key: ${{ secrets.DIGITALOCEAN_SSH_KEY }}
+        source: "viworks-backend-agent-built"
+        target: "/opt/viworks/deployments/backend-agent/viworks-backend-agent"
+        strip_components: 0
+    
+    - name: Copy Configuration to Server
+      uses: appleboy/scp-action@v0.1.4
+      with:
+        host: ${{ secrets.DIGITALOCEAN_HOST }}
+        username: ${{ secrets.DIGITALOCEAN_USERNAME }}
+        key: ${{ secrets.DIGITALOCEAN_SSH_KEY }}
+        source: "backend agent/config/"
+        target: "/opt/viworks/deployments/backend-agent/"
+        strip_components: 2
+    
+    - name: Deploy to Container
+      uses: appleboy/ssh-action@v0.1.5
+      with:
+        host: ${{ secrets.DIGITALOCEAN_HOST }}
+        username: ${{ secrets.DIGITALOCEAN_USERNAME }}
+        key: ${{ secrets.DIGITALOCEAN_SSH_KEY }}
+        script: |
+          # Make binary executable
+          chmod +x /opt/viworks/deployments/backend-agent/viworks-backend-agent
+          
+          # Stop current agent process
+          docker exec viworks-backend-agent-new bash -c "pkill -f viworks-backend-agent" || true
+          
+          # Wait for process to stop
+          sleep 5
+          
+          # Copy binary to container
+          docker cp /opt/viworks/deployments/backend-agent/viworks-backend-agent viworks-backend-agent-new:/app/
+          
+          # Copy configuration to container
+          docker cp /opt/viworks/deployments/backend-agent/config/backend-agent.toml viworks-backend-agent-new:/app/config/
+          
+          # Start container with new binary
+          docker exec viworks-backend-agent-new bash -c "cd /app && nohup ./viworks-backend-agent > /dev/null 2>&1 &"
+          
+          # Wait for startup
+          sleep 10
+          
+          # Verify deployment
+          curl -k https://agent.neuratalent.com/health || {
+            echo "Deployment verification failed, rolling back..."
+            docker exec viworks-backend-agent-new bash -c "pkill -f viworks-backend-agent"
+            if [ -f /opt/viworks/deployments/backend-agent/viworks-backend-agent.backup.$(date +%Y%m%d_%H%M%S) ]; then
+              cp /opt/viworks/deployments/backend-agent/viworks-backend-agent.backup.$(date +%Y%m%d_%H%M%S) /opt/viworks/deployments/backend-agent/viworks-backend-agent
+              docker exec viworks-backend-agent-new bash -c "cd /app && nohup ./viworks-backend-agent > /dev/null 2>&1 &"
+            fi
+            exit 1
+          }
+          
+          echo "Deployment successful!"
+
+  health-check:
+    name: Health Check
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+    - name: Comprehensive Health Check
+      uses: appleboy/ssh-action@v0.1.5
+      with:
+        host: ${{ secrets.DIGITALOCEAN_HOST }}
+        username: ${{ secrets.DIGITALOCEAN_USERNAME }}
+        key: ${{ secrets.DIGITALOCEAN_SSH_KEY }}
+        script: |
+          echo "=== Health Check ==="
+          
+          # Check container status
+          echo "Container status:"
+          docker ps | grep viworks-backend-agent-new
+          
+          # Check binary size
+          echo "Binary size:"
+          docker exec viworks-backend-agent-new ls -la /app/viworks-backend-agent
+          
+          # Test health endpoint
+          echo "Testing health endpoint:"
+          curl -k https://agent.neuratalent.com/health
+          
+          # Test API endpoint
+          echo "Testing API endpoint:"
+          curl -k https://agent.neuratalent.com/api/v1/status
+          
+          echo "Health check completed!"
