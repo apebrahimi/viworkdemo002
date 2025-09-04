@@ -113,6 +113,10 @@ jobs:
             exit 1
           fi
           
+          # Install system dependencies first (including curl)
+          echo 'Installing system dependencies...'
+          apt-get update && apt-get install -y build-essential pkg-config libssl-dev curl ca-certificates
+          
           # Install Rust (exact same as server)
           echo 'Installing Rust...'
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
@@ -121,10 +125,6 @@ jobs:
           # Show Rust version
           rustc --version
           cargo --version
-          
-          # Install system dependencies (exact same as server)
-          echo 'Installing system dependencies...'
-          apt-get update && apt-get install -y build-essential pkg-config libssl-dev
           
           # Build the binary (exact same as server)
           echo 'Building binary...'
