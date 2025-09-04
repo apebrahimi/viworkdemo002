@@ -81,6 +81,7 @@ jobs:
         docker exec viworks-build-temp ls -la /tmp/backend-agent-source.tar.gz
     
     - name: Build Inside Container (Exact Server Process)
+      timeout-minutes: 15
       run: |
         # Build inside container using exact same process as server
         docker exec --user root viworks-build-temp bash -c "
