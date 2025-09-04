@@ -32,7 +32,7 @@ jobs:
     if: ${{ github.event.inputs.phase == 'all' || github.event.inputs.phase == 'infrastructure' }}
     runs-on: ubuntu-latest
     steps:
-    - name: 🏗️ Checkout code
+    - name: Checkout code
       uses: actions/checkout@v4
 
     - name: 🔧 Setup SSH
@@ -42,7 +42,7 @@ jobs:
         chmod 600 ~/.ssh/id_ed25519
         ssh-keyscan -H ${{ env.DROPLET_IP }} >> ~/.ssh/known_hosts
 
-    - name: 🌐 Phase 1: Deploy Infrastructure
+    - name: Phase 1: Deploy Infrastructure
       run: |
         cat > deploy-phase1.sh << 'EOF'
         #!/bin/bash
@@ -120,7 +120,7 @@ jobs:
     if: ${{ always() && (needs.deploy-infrastructure.result == 'success' || github.event.inputs.phase == 'backend') }}
     runs-on: ubuntu-latest
     steps:
-    - name: 🏗️ Checkout code
+    - name: Checkout code
       uses: actions/checkout@v4
 
     - name: 🔧 Setup SSH
@@ -186,7 +186,7 @@ jobs:
     if: ${{ always() && (needs.deploy-backend.result == 'success' || github.event.inputs.phase == 'frontend') }}
     runs-on: ubuntu-latest
     steps:
-    - name: 🏗️ Checkout code
+    - name: Checkout code
       uses: actions/checkout@v4
 
     - name: 🔧 Setup SSH
@@ -196,7 +196,7 @@ jobs:
         chmod 600 ~/.ssh/id_ed25519
         ssh-keyscan -H ${{ env.DROPLET_IP }} >> ~/.ssh/known_hosts
 
-    - name: ⚛️ Phase 3: Deploy Frontend
+    - name: Phase 3: Deploy Frontend
       run: |
         cat > deploy-phase3.sh << 'EOF'
         #!/bin/bash
@@ -250,7 +250,7 @@ jobs:
     if: ${{ always() && (needs.deploy-frontend.result == 'success' || github.event.inputs.phase == 'website') }}
     runs-on: ubuntu-latest
     steps:
-    - name: 🏗️ Checkout code
+    - name: Checkout code
       uses: actions/checkout@v4
 
     - name: 🔧 Setup SSH
@@ -260,7 +260,7 @@ jobs:
         chmod 600 ~/.ssh/id_ed25519
         ssh-keyscan -H ${{ env.DROPLET_IP }} >> ~/.ssh/known_hosts
 
-    - name: 🌐 Phase 4: Deploy Website
+    - name: Phase 4: Deploy Website
       run: |
         cat > deploy-phase4.sh << 'EOF'
         #!/bin/bash
@@ -314,7 +314,7 @@ jobs:
     if: ${{ always() && (needs.deploy-website.result == 'success' || github.event.inputs.phase == 'agent') }}
     runs-on: ubuntu-latest
     steps:
-    - name: 🏗️ Checkout code
+    - name: Checkout code
       uses: actions/checkout@v4
 
     - name: 🔧 Setup SSH
@@ -371,7 +371,7 @@ jobs:
     if: ${{ always() && (needs.deploy-agent.result == 'success' || github.event.inputs.phase == 'all') }}
     runs-on: ubuntu-latest
     steps:
-    - name: 🏗️ Checkout code
+    - name: Checkout code
       uses: actions/checkout@v4
 
     - name: 🔧 Setup SSH
@@ -381,7 +381,7 @@ jobs:
         chmod 600 ~/.ssh/id_ed25519
         ssh-keyscan -H ${{ env.DROPLET_IP }} >> ~/.ssh/known_hosts
 
-    - name: 🌐 Phase 6: Deploy Nginx & Final Setup
+    - name: Phase 6: Deploy Nginx & Final Setup
       run: |
         cat > deploy-phase6.sh << 'EOF'
         #!/bin/bash
