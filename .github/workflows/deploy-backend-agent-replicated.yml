@@ -90,7 +90,24 @@ jobs:
           # Extract source code
           cd /tmp
           tar -xzf backend-agent-source.tar.gz
-          cd backend-agent/
+          
+          # List contents to debug
+          echo 'Contents after extraction:'
+          ls -la
+          
+          # Find the correct directory (it might be 'backend agent' with space)
+          if [ -d 'backend agent' ]; then
+            cd 'backend agent'
+            echo 'Found directory: backend agent'
+          elif [ -d 'backend-agent' ]; then
+            cd 'backend-agent'
+            echo 'Found directory: backend-agent'
+          else
+            echo 'Available directories:'
+            ls -la
+            echo 'Build failed: Could not find backend agent directory'
+            exit 1
+          fi
           
           # Install Rust (exact same as server)
           echo 'Installing Rust...'
