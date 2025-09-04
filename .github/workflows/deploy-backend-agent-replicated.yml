@@ -83,7 +83,7 @@ jobs:
     - name: Build Inside Container (Exact Server Process)
       run: |
         # Build inside container using exact same process as server
-        docker exec viworks-build-temp bash -c "
+        docker exec --user root viworks-build-temp bash -c "
           set -e
           echo '=== Starting Build Process (Replicating Server) ==='
           
