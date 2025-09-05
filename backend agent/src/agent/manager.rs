@@ -109,7 +109,7 @@ impl AgentManager {
             error!("WebSocket server not started - listener is None");
             crate::error::BackendAgentError::Internal("WebSocket server not started".to_string())
         })?;
-        
+
         info!("WebSocket server listener is available, starting server loop...");
 
         info!("Agent Manager server loop started, accepting connections...");
