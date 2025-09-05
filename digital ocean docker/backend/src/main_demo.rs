@@ -3,7 +3,7 @@ use actix_cors::Cors;
 use actix_web_actors::ws;
 use actix::{Actor, StreamHandler};
 use serde::{Deserialize, Serialize};
-use tracing::{info};
+use tracing::{info, error};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -11,6 +11,9 @@ use once_cell::sync::Lazy;
 use chrono::{Utc, Duration};
 use rand::Rng;
 use std::panic;
+use sqlx::{PgPool, Row};
+use bcrypt::{hash, verify, DEFAULT_COST};
+use uuid::Uuid;
 
 // Demo data structures
 #[derive(Debug, Serialize, Deserialize)]
@@ -46,6 +49,62 @@ struct ChallengeVerifyRequest {
 struct ChallengeVerifyResponse {
     success: bool,
     data: Option<AuthData>,
+}
+
+// Enhanced data structures for simplified auth flow
+#[derive(Debug, Serialize, Deserialize)]
+struct DeviceRegistrationRequest {
+    username: String,
+    password: String,
+    device_info: DeviceInfo,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct DeviceInfo {
+    device_id: String,
+    location: LocationInfo,
+    network_info: NetworkInfo,
+    device_fingerprint: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct LocationInfo {
+    latitude: f64,
+    longitude: f64,
+    country: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct NetworkInfo {
+    ip_address: String,
+    asn: String,
+    carrier: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct DeviceRegistrationResponse {
+    success: bool,
+    message: String,
+    device_id: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct TwoFactorRequest {
+    username: String,
+    device_id: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct TwoFactorValidation {
+    username: String,
+    code: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct ConnectionConfigs {
+    stunnel_config: String,
+    portknock_config: String,
+    openvpn_config: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -129,8 +188,35 @@ struct TerminateSessionRequest {
 static TWO_FACTOR_CODES: Lazy<Mutex<HashMap<String, (String, chrono::DateTime<Utc>)>>> = 
     Lazy::new(|| Mutex::new(HashMap::new()));
 
+// Database connection pool
+static DB_POOL: Lazy<Option<PgPool>> = Lazy::new(|| None);
+
 // Demo handlers
-async fn login(req: web::Json<LoginRequest>) -> HttpResponse {
+async fn login(req: web::Json<LoginRequest>, pool: web::Data<Option<PgPool>>) -> HttpResponse {
+    // Try database authentication first
+    if let Some(pool) = pool.as_ref() {
+        match authenticate_user(pool, &req.username, &req.password).await {
+            Ok(Some(user_id)) => {
+                info!("✅ User authenticated: {} (ID: {})", req.username, user_id);
+                let session_id = format!("SID{}", rand::thread_rng().gen_range(100..999));
+                return HttpResponse::Ok().json(LoginResponse {
+                    success: true,
+                    data: Some(LoginData {
+                        session_id,
+                        requires_2fa: true,
+                    }),
+                });
+            }
+            Ok(None) => {
+                info!("❌ Authentication failed for user: {}", req.username);
+            }
+            Err(e) => {
+                error!("❌ Database error during authentication: {}", e);
+            }
+        }
+    }
+    
+    // Fallback to demo credentials
     if req.username == "keyvan" && req.password == "password123" {
         let session_id = format!("SID{}", rand::thread_rng().gen_range(100..999));
         HttpResponse::Ok().json(LoginResponse {
@@ -264,11 +350,34 @@ async fn client_bootstrap(_req: web::Json<ClientBootstrapRequest>, _http_req: ac
     HttpResponse::Ok().json(response)
 }
 
-async fn create_user(_req: web::Json<CreateUserRequest>) -> HttpResponse {
-    HttpResponse::Ok().json(serde_json::json!({
-        "ok": true,
-        "message": "VPN user created successfully"
-    }))
+async fn create_user(req: web::Json<CreateUserRequest>, pool: web::Data<Option<PgPool>>) -> HttpResponse {
+    info!("👤 Creating user: {}", req.username);
+    
+    if let Some(pool) = pool.as_ref() {
+        match create_user_in_db(pool, &req.username, &req.email, &req.password).await {
+            Ok(user_id) => {
+                info!("✅ User created successfully: {} (ID: {})", req.username, user_id);
+                HttpResponse::Ok().json(serde_json::json!({
+                    "success": true,
+                    "message": "User created successfully",
+                    "user_id": user_id
+                }))
+            }
+            Err(e) => {
+                error!("❌ Failed to create user: {}", e);
+                HttpResponse::InternalServerError().json(serde_json::json!({
+                    "success": false,
+                    "message": "Failed to create user"
+                }))
+            }
+        }
+    } else {
+        error!("❌ Database not available");
+        HttpResponse::InternalServerError().json(serde_json::json!({
+            "success": false,
+            "message": "Database not available"
+        }))
+    }
 }
 
 async fn spawn_container(_req: web::Json<SpawnContainerRequest>) -> HttpResponse {
@@ -300,6 +409,211 @@ fn generate_random_path() -> String {
             CHARSET[idx] as char
         })
         .collect()
+}
+
+// Database authentication functions
+async fn authenticate_user(pool: &PgPool, username: &str, password: &str) -> Result<Option<Uuid>, sqlx::Error> {
+    let row = sqlx::query("SELECT id, password_hash FROM users WHERE username = $1 AND status = 'active'")
+        .bind(username)
+        .fetch_optional(pool)
+        .await?;
+    
+    if let Some(row) = row {
+        let user_id: Uuid = row.get("id");
+        let password_hash: String = row.get("password_hash");
+        
+        if verify(password, &password_hash).unwrap_or(false) {
+            // Update last login time
+            let _ = sqlx::query("UPDATE users SET last_login_at = NOW(), failed_login_attempts = 0 WHERE id = $1")
+                .bind(user_id)
+                .execute(pool)
+                .await;
+            
+            return Ok(Some(user_id));
+        } else {
+            // Increment failed login attempts
+            let _ = sqlx::query("UPDATE users SET failed_login_attempts = failed_login_attempts + 1 WHERE id = $1")
+                .bind(user_id)
+                .execute(pool)
+                .await;
+        }
+    }
+    
+    Ok(None)
+}
+
+async fn create_user_in_db(pool: &PgPool, username: &str, email: &str, password: &str) -> Result<Uuid, sqlx::Error> {
+    let password_hash = hash(password, DEFAULT_COST).unwrap();
+    let user_id = Uuid::new_v4();
+    
+    sqlx::query("INSERT INTO users (id, username, email, password_hash, status, roles) VALUES ($1, $2, $3, $4, 'active', '[\"user\"]')")
+        .bind(user_id)
+        .bind(username)
+        .bind(email)
+        .bind(password_hash)
+        .execute(pool)
+        .await?;
+    
+    Ok(user_id)
+}
+
+// Enhanced endpoint handlers for simplified auth flow
+async fn register_mobile_device(req: web::Json<DeviceRegistrationRequest>) -> HttpResponse {
+    info!("📱 Device registration request for user: {}", req.username);
+    
+    // Validate credentials (demo: accept keyvan/password123)
+    if req.username != "keyvan" || req.password != "password123" {
+        return HttpResponse::Unauthorized().json(serde_json::json!({
+            "success": false,
+            "message": "Invalid credentials"
+        }));
+    }
+    
+    // Store device info (in demo mode, just log it)
+    info!("📱 Device registered: ID={}, Location={}, IP={}", 
+        req.device_info.device_id,
+        req.device_info.location.country,
+        req.device_info.network_info.ip_address
+    );
+    
+    HttpResponse::Ok().json(DeviceRegistrationResponse {
+        success: true,
+        message: "Device registered successfully",
+        device_id: req.device_info.device_id.clone(),
+    })
+}
+
+async fn request_2fa_code(req: web::Json<TwoFactorRequest>) -> HttpResponse {
+    info!("🔐 2FA request for user: {}, device: {}", req.username, req.device_id);
+    
+    // Validate credentials (demo: accept keyvan/password123)
+    if req.username != "keyvan" {
+        return HttpResponse::Unauthorized().json(serde_json::json!({
+            "success": false,
+            "message": "Invalid credentials"
+        }));
+    }
+    
+    // Generate 6-digit code
+    let mut rng = rand::thread_rng();
+    let code = format!("{:06}", rng.gen_range(100000..999999));
+    
+    // Store code with 5-minute TTL
+    let expires_at = Utc::now() + Duration::minutes(5);
+    {
+        let mut codes = TWO_FACTOR_CODES.lock().unwrap();
+        codes.insert(format!("{}:{}", req.username, req.device_id), (code.clone(), expires_at));
+    }
+    
+    info!("🔐 2FA code generated: {} for device: {}", code, req.device_id);
+    
+    HttpResponse::Ok().json(serde_json::json!({
+        "success": true,
+        "message": "2FA code generated and sent to mobile device",
+        "code": code, // In demo mode, return code directly
+        "ttl": 300
+    }))
+}
+
+async fn validate_2fa_code(req: web::Json<TwoFactorValidation>) -> HttpResponse {
+    info!("✅ 2FA validation for user: {}", req.username);
+    
+    // Check stored code
+    let key = format!("{}:demo-device", req.username);
+    let codes = TWO_FACTOR_CODES.lock().unwrap();
+    
+    if let Some((stored_code, expires_at)) = codes.get(&key) {
+        if Utc::now() < *expires_at && stored_code == &req.code {
+            // Generate connection configs
+            let configs = ConnectionConfigs {
+                stunnel_config: format!(
+                    "client = yes\n\
+                    [https]\n\
+                    accept = 127.0.0.1:8443\n\
+                    connect = gw.example.com:443\n\
+                    cert = /etc/ssl/certs/client.crt\n\
+                    key = /etc/ssl/private/client.key\n\
+                    CAfile = /etc/ssl/certs/ca.crt"
+                ),
+                portknock_config: format!(
+                    "#!/bin/bash\n\
+                    # Port knocking sequence\n\
+                    for port in 1000 2000 3000; do\n\
+                        nc -z gw.example.com $port\n\
+                        sleep 1\n\
+                    done"
+                ),
+                openvpn_config: format!(
+                    "client\n\
+                    dev tun\n\
+                    proto tcp\n\
+                    remote 127.0.0.1 9443\n\
+                    resolv-retry infinite\n\
+                    nobind\n\
+                    persist-key\n\
+                    persist-tun\n\
+                    remote-cert-tls server\n\
+                    cipher AES-256-GCM\n\
+                    auth SHA256\n\
+                    key-direction 1\n\
+                    verb 3\n\
+                    auth-user-pass /etc/openvpn/auth.txt"
+                ),
+            };
+            
+            info!("✅ 2FA validation successful, returning connection configs");
+            
+            return HttpResponse::Ok().json(serde_json::json!({
+                "success": true,
+                "message": "2FA validation successful",
+                "configs": configs
+            }));
+        }
+    }
+    
+    HttpResponse::Unauthorized().json(serde_json::json!({
+        "success": false,
+        "message": "Invalid or expired 2FA code"
+    }))
+}
+
+async fn get_users(pool: web::Data<Option<PgPool>>) -> HttpResponse {
+    if let Some(pool) = pool.as_ref() {
+        match sqlx::query("SELECT id, username, email, status, created_at, last_login_at FROM users ORDER BY created_at DESC")
+            .fetch_all(pool)
+            .await
+        {
+            Ok(rows) => {
+                let users: Vec<serde_json::Value> = rows.iter().map(|row| {
+                    serde_json::json!({
+                        "id": row.get::<Uuid, _>("id"),
+                        "username": row.get::<String, _>("username"),
+                        "email": row.get::<String, _>("email"),
+                        "status": row.get::<String, _>("status"),
+                        "created_at": row.get::<chrono::DateTime<chrono::Utc>, _>("created_at"),
+                        "last_login_at": row.get::<Option<chrono::DateTime<chrono::Utc>>, _>("last_login_at")
+                    })
+                }).collect();
+                
+                HttpResponse::Ok().json(serde_json::json!({
+                    "success": true,
+                    "users": users
+                }))
+            }
+            Err(e) => {
+                error!("❌ Failed to fetch users: {}", e);
+                HttpResponse::InternalServerError().json(serde_json::json!({
+                    "success": false,
+                    "message": "Failed to fetch users"
+                }))
+            }
+        }
+    } else {
+        HttpResponse::InternalServerError().json(serde_json::json!({
+            "success": false,
+            "message": "Database not available"
+        }))
+    }
 }
 
 // WebSocket handler
@@ -354,6 +668,22 @@ async fn main() -> std::io::Result<()> {
         std::env::var("PORT").unwrap_or_else(|_| "8081".to_string())
     );
 
+    // Initialize database connection
+    let database_url = std::env::var("DATABASE_URL")
+        .unwrap_or_else(|_| "postgres://admin:viworks_password_2024@viworks-postgres:5432/viworks".to_string());
+    
+    info!("🔗 Connecting to database...");
+    let pool = match sqlx::PgPool::connect(&database_url).await {
+        Ok(pool) => {
+            info!("✅ Database connection established");
+            Some(pool)
+        }
+        Err(e) => {
+            error!("❌ Failed to connect to database: {}", e);
+            None
+        }
+    };
+
     let host = std::env::var("HOST").unwrap_or_else(|_| "0.0.0.0".to_string());
     let port = std::env::var("PORT")
         .unwrap_or_else(|_| "8081".to_string())
@@ -364,7 +694,7 @@ async fn main() -> std::io::Result<()> {
 
     // Start HTTP server with error handling
     info!("🔧 Creating HTTP server...");
-    let server = HttpServer::new(|| {
+    let server = HttpServer::new(move || {
         let cors = Cors::default()
             .allow_any_origin()
             .allow_any_method()
@@ -373,6 +703,7 @@ async fn main() -> std::io::Result<()> {
             .max_age(3600);
 
         App::new()
+            .app_data(web::Data::new(pool.clone()))
             .wrap(cors)
             .route("/health", web::get().to(|| async { 
                 HttpResponse::Ok().json(serde_json::json!({
@@ -405,30 +736,12 @@ async fn main() -> std::io::Result<()> {
             .route("/api/v1/agent/user/create", web::post().to(create_user))
             .route("/api/v1/agent/container/spawn", web::post().to(spawn_container))
             .route("/api/v1/agent/session/terminate", web::post().to(terminate_session))
+            // Enhanced endpoints for simplified auth flow
+            .route("/api/v1/device/register", web::post().to(register_mobile_device))
+            .route("/api/v1/auth/2fa/request", web::post().to(request_2fa_code))
+            .route("/api/v1/auth/2fa/validate", web::post().to(validate_2fa_code))
             // Mock endpoints for admin panel
-            .route("/api/v1/users", web::get().to(|| async { 
-                HttpResponse::Ok().json(serde_json::json!({
-                    "users": [
-                        {
-                            "id": "1701fe72-fb04-4e26-8d20-1eacb234746e",
-                            "username": "admin",
-                            "email": "admin@viworks.local",
-                            "role": "owner",
-                            "status": "active"
-                        },
-                        {
-                            "id": "ec3ce0b2-78b5-4812-b82f-cea8730136ac",
-                            "username": "keyvan",
-                            "email": "keyvan@viworks.local",
-                            "role": "user",
-                            "status": "active"
-                        }
-                    ],
-                    "total": 2,
-                    "page": 1,
-                    "per_page": 10
-                }))
-            }))
+            .route("/api/v1/users", web::get().to(get_users))
             .route("/api/v1/sessions", web::get().to(|| async { 
                 HttpResponse::Ok().json(serde_json::json!({
                     "sessions": [
@@ -470,6 +783,9 @@ async fn main() -> std::io::Result<()> {
                         "challenge_verify": "/api/v1/auth/challenge/verify",
                         "device_bind": "/api/v1/device/bind-request",
                         "client_bootstrap": "/api/v1/client/bootstrap",
+                        "device_register": "/api/v1/device/register",
+                        "2fa_request": "/api/v1/auth/2fa/request",
+                        "2fa_validate": "/api/v1/auth/2fa/validate",
                         "agent_user_create": "/api/v1/agent/user/create",
                         "agent_container_spawn": "/api/v1/agent/container/spawn",
                         "agent_session_terminate": "/api/v1/agent/session/terminate"
