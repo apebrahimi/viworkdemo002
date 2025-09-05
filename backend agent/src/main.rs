@@ -66,7 +66,8 @@ async fn main() -> BackendAgentResult<()> {
     info!("Database schema initialized successfully");
 
     // Initialize components
-    let agent_manager = agent::AgentManager::new(config.clone(), data_layer.clone()).await?;
+    let mut agent_manager = agent::AgentManager::new(config.clone(), data_layer.clone()).await?;
+    agent_manager.start().await?;
     let agent_manager_arc = Arc::new(agent_manager);
 
     let command_engine = command::CommandEngine::new(
