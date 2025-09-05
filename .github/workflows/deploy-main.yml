@@ -123,6 +123,10 @@ jobs:
           echo "🔗 Updating repository remote to new location..."
           git remote set-url origin git@github.com:shaiannazari/viworksolution.git
           
+          # Test SSH connection to GitHub
+          echo "🔑 Testing SSH connection to GitHub..."
+          ssh -T git@github.com || echo "SSH test completed (expected to fail with exit code 1)"
+          
           # Clean up any existing files and reset git
           echo "🧹 Cleaning up and resetting git repository..."
           git fetch origin
