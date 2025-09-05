@@ -30,16 +30,16 @@ export const authApi = {
     const response = await api.post<any>('/api/v1/auth/login', credentials);
     console.log('API service: Raw response:', response);
     
-    // Transform enhanced backend response to match expected format
+    // Transform real backend response to match expected format
     const transformedResponse = {
       success: response.success,
-      message: response.message,
-      token: response.data?.data?.session_id || 'demo_token',
+      message: response.message || 'Login successful',
+      token: response.data?.session_id || 'demo_token',
       refresh_token: 'demo_refresh_token',
       user: {
-        id: 'demo_user_id',
+        id: 'admin_user_id',
         username: credentials.username,
-        email: `${credentials.username}@demo.com`,
+        email: `${credentials.username}@viworks.com`,
         role: 'admin',
         status: 'active',
         created_at: new Date().toISOString(),
@@ -104,34 +104,34 @@ export const healthApi = {
 export const usersApi = {
   getUsers: async (filters?: FilterOptions): Promise<UserListResponse> => {
     try {
-      const response = await api.get<any>('/api/v1/admin/users');
+      const response = await api.get<any>('/api/v1/users');
       
-      // Transform enhanced backend response
+      // Transform real backend response
+      const users = response.users?.map((user: any) => ({
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        mobile: '09123456789', // Default mobile
+        role: 'user', // Default role
+        status: user.status,
+        device_bound: true, // Default to true
+        created_at: user.created_at,
+        last_login: user.last_login_at || new Date().toISOString(),
+      })) || [];
+      
       return {
-        users: response.users || [],
-        total: response.users?.length || 0,
+        users,
+        total: users.length,
         page: 1,
         per_page: 10,
         total_pages: 1,
       };
     } catch (error) {
       console.error('Error fetching users:', error);
-      // Return mock data on error to prevent logout
+      // Return empty array on error instead of mock data
       return {
-        users: [
-          {
-            id: 'demo_user_1',
-            username: 'demo_user',
-            email: 'demo@example.com',
-            mobile: '09123456789',
-            role: 'user',
-            status: 'active',
-            device_bound: true,
-            created_at: new Date().toISOString(),
-            last_login: new Date().toISOString(),
-          }
-        ],
-        total: 1,
+        users: [],
+        total: 0,
         page: 1,
         per_page: 10,
         total_pages: 1,
@@ -156,20 +156,18 @@ export const usersApi = {
   },
 
   createUser: async (userData: CreateUserRequest): Promise<User> => {
-    const response = await api.post<any>('/api/v1/admin/users/create', {
+    const response = await api.post<any>('/api/v1/agent/user/create', {
       username: userData.username,
       email: userData.email,
-      mobile: userData.mobile || '09123456789',
-      policy_window: 'Mon-Fri 09:00-17:00',
-      device_binding: true,
+      password: userData.password,
     });
     
     return {
-      id: response.user.username,
-      username: response.user.username,
-      email: response.user.email,
+      id: response.user_id,
+      username: userData.username,
+      email: userData.email,
       role: 'user',
-      status: response.user.status,
+      status: 'active',
       created_at: new Date().toISOString(),
       last_login: new Date().toISOString(),
     };
