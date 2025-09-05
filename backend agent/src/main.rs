@@ -98,8 +98,11 @@ async fn main() -> BackendAgentResult<()> {
     let websocket_server_task = {
         let agent_manager = agent_manager_arc.clone();
         tokio::spawn(async move {
+            info!("Starting WebSocket server loop...");
             if let Err(e) = agent_manager.run_server_loop().await {
                 error!("WebSocket server loop failed: {}", e);
+            } else {
+                info!("WebSocket server loop completed successfully");
             }
         })
     };

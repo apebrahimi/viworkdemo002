@@ -106,8 +106,11 @@ impl AgentManager {
     /// Run the main server loop
     pub async fn run_server_loop(&self) -> BackendAgentResult<()> {
         let listener = self.listener.as_ref().ok_or_else(|| {
+            error!("WebSocket server not started - listener is None");
             crate::error::BackendAgentError::Internal("WebSocket server not started".to_string())
         })?;
+        
+        info!("WebSocket server listener is available, starting server loop...");
 
         info!("Agent Manager server loop started, accepting connections...");
 
