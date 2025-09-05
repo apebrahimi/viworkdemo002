@@ -1,0 +1,30 @@
+[agent]
+id = "${AGENT_ID:-gateway-001}"
+host = "${AGENT_HOST:-0.0.0.0}"
+port = ${AGENT_PORT:-8443}
+log_level = "${LOG_LEVEL:-info}"
+max_connections = ${MAX_CONNECTIONS:-100}
+
+[security]
+cert_file = "${CERT_FILE:-/etc/viworks/agent.crt}"
+key_file = "${KEY_FILE:-/etc/viworks/agent.key}"
+ca_file = "${CA_FILE:-/etc/viworks/ca.crt}"
+allowed_clients = ${ALLOWED_CLIENTS:-["backend.example.com"]}
+
+[scripts]
+openvpn_create = "${OPENVPN_CREATE_SCRIPT:-/opt/Viworks/scripts_viworks/add_vpn_user.sh}"
+openvpn_delete = "${OPENVPN_DELETE_SCRIPT:-/opt/Viworks/scripts_viworks/delete_vpn_user.sh}"
+panel_create = "${PANEL_CREATE_SCRIPT:-/opt/Viworks/scripts_viworks/add_user.sh}"
+panel_delete = "${PANEL_DELETE_SCRIPT:-/opt/Viworks/scripts_viworks/delete_user.sh}"
+
+[monitoring]
+status_interval_seconds = ${STATUS_INTERVAL:-30}
+health_check_interval_seconds = ${HEALTH_CHECK_INTERVAL:-60}
+max_log_size_mb = ${MAX_LOG_SIZE:-100}
+log_retention_days = ${LOG_RETENTION:-30}
+
+[containers]
+docker_socket = "${DOCKER_SOCKET:-/var/run/docker.sock}"
+base_image = "${BASE_IMAGE:-viworks/chrome:latest}"
+max_containers = ${MAX_CONTAINERS:-50}
+container_timeout_seconds = ${CONTAINER_TIMEOUT:-3600}

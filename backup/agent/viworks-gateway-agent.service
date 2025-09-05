@@ -1,0 +1,42 @@
+[Unit]
+Description=ViWorkS Gateway Agent
+Documentation=https://github.com/viworks/viworks-gateway-agent
+After=network.target docker.service
+Requires=docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/opt/viworks/agent
+EnvironmentFile=/opt/viworks/agent/.env
+ExecStart=/opt/viworks/viworks-gateway-agent
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=viworks-gateway-agent
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=4096
+MemoryMax=512M
+CPUQuota=50%
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/viworks/agent
+ReadWritePaths=/var/log/viworks
+ReadWritePaths=/tmp
+
+# Environment
+Environment=RUST_LOG=info
+Environment=RUST_BACKTRACE=1
+
+[Install]
+WantedBy=multi-user.target

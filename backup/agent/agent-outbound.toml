@@ -1,0 +1,58 @@
+[agent]
+bind_address = "0.0.0.0:8443"
+log_level = "info"
+max_connections = 100
+request_timeout = 30
+
+[security]
+allowed_ips = ["0.0.0.0/0"]
+rate_limit_requests = 100
+rate_limit_window = 60
+require_client_cert = false
+
+[scripts]
+openvpn_create = "/opt/Viworks/scripts_viworks/add_vpn_user.sh"
+openvpn_delete = "/opt/Viworks/scripts_viworks/delete_vpn_user.sh"
+panel_create = "/opt/Viworks/scripts_viworks/add_user.sh"
+panel_delete = "/opt/Viworks/scripts_viworks/delete_user.sh"
+
+[monitoring]
+collect_interval = 30
+retention_days = 30
+metrics_enabled = true
+
+[containers]
+base_image = "viworks/chrome:latest"
+memory_limit = "512m"
+cpu_limit = "0.5"
+network_mode = "bridge"
+port_range_start = 8000
+port_range_end = 9000
+
+[outbound]
+# Backend connection URL (WebSocket)
+backend_url = "wss://backend.example.com/agent"
+
+# Agent identification
+agent_id = "gateway-001"
+site = "production"
+
+# mTLS client certificates
+cert_path = "/etc/viworks-agent/client.crt"
+key_path = "/etc/viworks-agent/client.key"
+trust_bundle = "/etc/viworks-agent/ca.crt"
+
+# SPKI pin for backend certificate validation
+backend_spki_pin = "your-backend-spki-pin-here"
+
+# Feature flags
+feature_inbound_http = false  # Disable inbound HTTP in production
+feature_exec_enable = true    # Enable command execution
+
+# Scripts and execution
+scripts_root = "/opt/Viworks/scripts_viworks"
+max_concurrency = 4           # Maximum concurrent command executions
+cmd_timeout_secs = 45         # Command execution timeout
+
+# Container engine
+container_engine = "docker"

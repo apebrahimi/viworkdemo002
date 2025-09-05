@@ -1,0 +1,51 @@
+[agent]
+bind_address = "0.0.0.0:8443"
+log_level = "info"
+max_connections = 100
+request_timeout = 30
+
+[security]
+allowed_ips = ["0.0.0.0/0"]
+rate_limit_requests = 100
+rate_limit_window = 60
+require_client_cert = false
+
+[scripts]
+openvpn_create = "/opt/Viworks/scripts_viworks/add_vpn_user.sh"
+openvpn_delete = "/opt/Viworks/scripts_viworks/delete_vpn_user.sh"
+panel_create = "/opt/Viworks/scripts_viworks/add_user.sh"
+panel_delete = "/opt/Viworks/scripts_viworks/delete_user.sh"
+
+[monitoring]
+collect_interval = 30
+retention_days = 30
+metrics_enabled = true
+
+[containers]
+base_image = "viworks/chrome:latest"
+memory_limit = "512m"
+cpu_limit = "0.5"
+network_mode = "bridge"
+port_range_start = 8000
+port_range_end = 9000
+
+[outbound]
+backend_url = "wss://agent.neuratalent.com/ws/agent"
+agent_id = "os-agent-178-128-42-148"
+site = "production"
+cert_path = "/opt/viworks/agent/certs/agent.crt"
+key_path = "/opt/viworks/agent/certs/agent.key"
+trust_bundle = "/opt/viworks/agent/certs/ca.crt"
+backend_spki_pin = "dummy-spki-pin-for-testing"
+feature_inbound_http = true
+feature_exec_enable = true
+scripts_root = "/opt/Viworks/scripts_viworks"
+max_concurrency = 10
+cmd_timeout_secs = 30
+container_engine = "docker"
+enable_telemetry = true
+enable_commands = true
+telemetry_interval = 30
+heartbeat_interval = 10
+max_retry_attempts = 5
+connection_timeout = 30
