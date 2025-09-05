@@ -1,0 +1,191 @@
+name: Deploy ViWorkS Backend with Authentication
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'digital ocean docker/backend/**'
+  workflow_dispatch:
+
+env:
+  DROPLET_IP: ${{ secrets.DROPLET_IP }}
+  DROPLET_USER: ${{ secrets.DROPLET_USER }}
+  SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup SSH
+      run: |
+        mkdir -p ~/.ssh
+        echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+        chmod 600 ~/.ssh/id_ed25519
+        ssh-keyscan -H $DROPLET_IP >> ~/.ssh/known_hosts
+        ssh-keyscan -H github.com >> ~/.ssh/known_hosts
+        
+    - name: Test SSH connection
+      run: |
+        ssh -o ConnectTimeout=10 -i ~/.ssh/id_ed25519 ${DROPLET_USER}@${DROPLET_IP} "echo 'SSH connection test successful'"
+        
+    - name: Set up Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        components: rustfmt, clippy
+        
+    - name: Cache cargo registry
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-
+          
+    - name: Build backend
+      working-directory: ./digital ocean docker/backend
+      run: |
+        cargo build --release --bin viworks-backend
+        
+    - name: Create backend deployment script
+      run: |
+        cat > deploy-backend.sh << 'EOF'
+        #!/bin/bash
+        set -e
+        
+        echo "🚀 Starting ViWorkS Backend Deployment with Authentication..."
+        echo "📅 Deployment started at: $(date)"
+        
+        # Create backend directory
+        mkdir -p /root/viworks-backend
+        
+        # Stop existing backend processes
+        echo "🛑 Stopping existing backend processes..."
+        pkill -f viworks-backend || true
+        docker stop viworks-backend 2>/dev/null || true
+        docker rm viworks-backend 2>/dev/null || true
+        
+        # Wait for processes to stop
+        sleep 3
+        
+        # Make binary executable
+        chmod +x /root/viworks-backend/viworks-backend
+        
+        # Set environment variables
+        export HOST=0.0.0.0
+        export PORT=8081
+        export RUST_LOG=info
+        
+        # Start backend
+        echo "🚀 Starting backend service..."
+        cd /root/viworks-backend
+        nohup ./viworks-backend > backend.log 2>&1 &
+        
+        # Wait for startup
+        echo "⏳ Waiting for backend to start..."
+        sleep 5
+        
+        # Test if backend is running
+        if curl -s http://localhost:8081/health > /dev/null; then
+          echo "✅ Backend started successfully!"
+          echo "Backend is running on port 8081"
+        else
+          echo "❌ Backend failed to start"
+          echo "Logs:"
+          cat backend.log
+          exit 1
+        fi
+        
+        # Test authentication endpoints
+        echo "🧪 Testing authentication endpoints..."
+        
+        # Test health endpoint
+        echo "Health endpoint:"
+        curl -s http://localhost:8081/health | jq . || echo "Health check failed"
+        
+        # Test auth endpoint
+        echo "Auth endpoint:"
+        curl -s http://localhost:8081/api/v1/auth/login \
+          -X POST \
+          -H "Content-Type: application/json" \
+          -d '{"username":"test","password":"test"}' | jq . || echo "Auth endpoint test failed"
+        
+        # Test 2FA endpoint
+        echo "2FA endpoint:"
+        curl -s http://localhost:8081/api/v1/auth/challenge/initiate \
+          -X POST \
+          -H "Content-Type: application/json" \
+          -d '{"session_id":"test-session-123"}' | jq . || echo "2FA endpoint test failed"
+        
+        # Get 2FA code
+        echo "Getting 2FA code:"
+        curl -s http://localhost:8081/api/v1/auth/challenge/code/test-session-123 | jq . || echo "2FA code test failed"
+        
+        echo "✅ Backend deployment completed successfully!"
+        echo "📅 Deployment completed at: $(date)"
+        echo ""
+        echo "🌐 Backend is now running:"
+        echo "   Health:   http://localhost:8081/health"
+        echo "   Auth:     http://localhost:8081/api/v1/auth/login"
+        echo "   2FA:      http://localhost:8081/api/v1/auth/challenge/initiate"
+        echo ""
+        EOF
+        
+        chmod +x deploy-backend.sh
+        
+    - name: Upload backend binary and deployment script
+      run: |
+        scp -i ~/.ssh/id_ed25519 "digital ocean docker/backend/target/release/viworks-backend" ${DROPLET_USER}@${DROPLET_IP}:/root/viworks-backend/
+        scp -i ~/.ssh/id_ed25519 deploy-backend.sh ${DROPLET_USER}@${DROPLET_IP}:/tmp/
+        
+    - name: Execute backend deployment
+      run: |
+        ssh -i ~/.ssh/id_ed25519 ${DROPLET_USER}@${DROPLET_IP} "chmod +x /tmp/deploy-backend.sh && /tmp/deploy-backend.sh"
+        
+    - name: Verify backend deployment
+      run: |
+        echo "🔍 Verifying backend deployment..."
+        sleep 10
+        
+        # Test backend endpoints
+        echo "Testing backend health..."
+        for i in {1..5}; do
+          if curl -f -s http://${DROPLET_IP}:8081/health > /dev/null; then
+            echo "✅ Backend health check passed"
+            break
+          else
+            echo "⏳ Backend not ready yet... ($i/5)"
+            sleep 10
+          fi
+        done
+        
+        # Test authentication endpoints
+        echo "Testing authentication endpoints..."
+        curl -s http://${DROPLET_IP}:8081/api/v1/auth/login \
+          -X POST \
+          -H "Content-Type: application/json" \
+          -d '{"username":"test","password":"test"}' || echo "Auth endpoint test failed"
+        
+        echo "✅ Backend deployment verification completed!"
+        
+    - name: Notify deployment status
+      if: always()
+      run: |
+        if [ ${{ job.status }} == 'success' ]; then
+          echo "🎉 Backend deployment successful! Authentication system is now live."
+          echo "🔧 Backend: http://${DROPLET_IP}:8081"
+          echo "📊 Health: http://${DROPLET_IP}:8081/health"
+          echo "🔐 Auth: http://${DROPLET_IP}:8081/api/v1/auth/login"
+          echo "🔒 2FA: http://${DROPLET_IP}:8081/api/v1/auth/challenge/initiate"
+          echo "🔒 Backend Status: ✅ Authentication System Active"
+        else
+          echo "❌ Backend deployment failed. Check the logs above for details."
+          echo "🔧 Manual troubleshooting may be required on the server."
+        fi

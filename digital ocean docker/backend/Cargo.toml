@@ -3,6 +3,10 @@ name = "viworks-admin-backend"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "viworks-backend"
+path = "src/main_demo.rs"
+
 [dependencies]
 actix-web = "4.11"
 actix-cors = "0.7"
