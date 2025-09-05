@@ -624,7 +624,7 @@ async fn get_users(pool: web::Data<Option<PgPool>>) -> HttpResponse {
 }
 
 // Admin panel endpoint functions
-async fn get_sessions(pool: web::Data<Option<PgPool>>) -> HttpResponse {
+async fn get_sessions(_pool: web::Data<Option<PgPool>>) -> HttpResponse {
     info!("📋 Fetching sessions from database...");
     
     // For now, return mock sessions since we don't have a sessions table yet
@@ -644,7 +644,7 @@ async fn get_sessions(pool: web::Data<Option<PgPool>>) -> HttpResponse {
     }))
 }
 
-async fn get_device_requests(pool: web::Data<Option<PgPool>>) -> HttpResponse {
+async fn get_device_requests(_pool: web::Data<Option<PgPool>>) -> HttpResponse {
     info!("📋 Fetching device requests from database...");
     
     // For now, return mock device requests since we don't have a device_requests table yet
@@ -663,7 +663,7 @@ async fn get_device_requests(pool: web::Data<Option<PgPool>>) -> HttpResponse {
     }))
 }
 
-async fn get_audit_logs(pool: web::Data<Option<PgPool>>) -> HttpResponse {
+async fn get_audit_logs(_pool: web::Data<Option<PgPool>>) -> HttpResponse {
     info!("📋 Fetching audit logs from database...");
     
     // For now, return mock audit logs since we don't have an audit_logs table yet
@@ -685,6 +685,17 @@ async fn get_audit_logs(pool: web::Data<Option<PgPool>>) -> HttpResponse {
     HttpResponse::Ok().json(serde_json::json!({
         "success": true,
         "logs": mock_logs
+    }))
+}
+
+// API status handler
+async fn api_status(pool: web::Data<Option<PgPool>>) -> HttpResponse {
+    let db_status = if pool.is_some() { "connected" } else { "disconnected" };
+    HttpResponse::Ok().json(serde_json::json!({
+        "message": "ViWorkS Admin Panel Backend (Demo Mode) is running!",
+        "database": db_status.to_string(),
+        "redis": "connected",
+        "status": "healthy"
     }))
 }
 
@@ -790,15 +801,7 @@ async fn main() -> std::io::Result<()> {
                     "status": "ok"
                 }))
             }))
-            .route("/api/status", web::get().to(move || async { 
-                let db_status = if pool.is_some() { "connected" } else { "disconnected" };
-                HttpResponse::Ok().json(serde_json::json!({
-                    "message": "ViWorkS Admin Panel Backend (Demo Mode) is running!",
-                    "database": db_status,
-                    "redis": "connected",
-                    "status": "healthy"
-                }))
-            }))
+            .route("/api/status", web::get().to(api_status))
             // Demo endpoints
             .route("/api/v1/auth/login", web::post().to(login))
             .route("/api/v1/auth/challenge/initiate", web::post().to(challenge_initiate))
