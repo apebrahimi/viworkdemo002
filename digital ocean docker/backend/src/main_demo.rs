@@ -623,6 +623,71 @@ async fn get_users(pool: web::Data<Option<PgPool>>) -> HttpResponse {
     }
 }
 
+// Admin panel endpoint functions
+async fn get_sessions(pool: web::Data<Option<PgPool>>) -> HttpResponse {
+    info!("📋 Fetching sessions from database...");
+    
+    // For now, return mock sessions since we don't have a sessions table yet
+    let mock_sessions = vec![
+        serde_json::json!({
+            "session_id": "SID123",
+            "username": "admin",
+            "access_token": "demo_access_token_SID123",
+            "created_at": Utc::now().to_rfc3339(),
+            "otp_expires": (Utc::now() + Duration::minutes(5)).to_rfc3339(),
+        })
+    ];
+    
+    HttpResponse::Ok().json(serde_json::json!({
+        "success": true,
+        "sessions": mock_sessions
+    }))
+}
+
+async fn get_device_requests(pool: web::Data<Option<PgPool>>) -> HttpResponse {
+    info!("📋 Fetching device requests from database...");
+    
+    // For now, return mock device requests since we don't have a device_requests table yet
+    let mock_requests = vec![
+        serde_json::json!({
+            "username": "admin",
+            "fingerprint": "demo_fingerprint_123456789",
+            "status": "approved",
+            "created_at": Utc::now().to_rfc3339(),
+        })
+    ];
+    
+    HttpResponse::Ok().json(serde_json::json!({
+        "success": true,
+        "requests": mock_requests
+    }))
+}
+
+async fn get_audit_logs(pool: web::Data<Option<PgPool>>) -> HttpResponse {
+    info!("📋 Fetching audit logs from database...");
+    
+    // For now, return mock audit logs since we don't have an audit_logs table yet
+    let mock_logs = vec![
+        serde_json::json!({
+            "timestamp": Utc::now().to_rfc3339(),
+            "event": "LOGIN_SUCCESS",
+            "user": "admin",
+            "details": "User logged in successfully",
+        }),
+        serde_json::json!({
+            "timestamp": (Utc::now() - Duration::minutes(5)).to_rfc3339(),
+            "event": "USER_CREATE",
+            "user": "admin",
+            "details": "New user created: test_user",
+        })
+    ];
+    
+    HttpResponse::Ok().json(serde_json::json!({
+        "success": true,
+        "logs": mock_logs
+    }))
+}
+
 // WebSocket handler
 async fn ws_handler(req: actix_web::HttpRequest, stream: web::Payload) -> Result<HttpResponse, actix_web::Error> {
     ws::start(MyWs {}, &req, stream)
@@ -748,8 +813,13 @@ async fn main() -> std::io::Result<()> {
             .route("/api/v1/device/register", web::post().to(register_mobile_device))
             .route("/api/v1/auth/2fa/request", web::post().to(request_2fa_code))
             .route("/api/v1/auth/2fa/validate", web::post().to(validate_2fa_code))
-            // Mock endpoints for admin panel
+            // Admin panel endpoints
             .route("/api/v1/users", web::get().to(get_users))
+            .route("/api/v1/admin/users", web::get().to(get_users))
+            .route("/api/v1/admin/sessions", web::get().to(get_sessions))
+            .route("/api/v1/admin/device-requests", web::get().to(get_device_requests))
+            .route("/api/v1/admin/device/requests", web::get().to(get_device_requests))
+            .route("/api/v1/admin/audit-logs", web::get().to(get_audit_logs))
             .route("/api/v1/sessions", web::get().to(|| async { 
                 HttpResponse::Ok().json(serde_json::json!({
                     "sessions": [
