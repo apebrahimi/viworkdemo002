@@ -589,18 +589,37 @@ async fn get_users(pool: web::Data<Option<PgPool>>) -> HttpResponse {
         {
             Ok(rows) => {
                 info!("✅ Found {} users in database", rows.len());
-                let users: Vec<serde_json::Value> = rows.iter().map(|row| {
-                    serde_json::json!({
-                        "id": row.get::<Uuid, _>("id"),
-                        "username": row.get::<String, _>("username"),
-                        "email": row.get::<String, _>("email"),
-                        "status": row.get::<String, _>("status"),
-                        "created_at": row.get::<chrono::DateTime<chrono::Utc>, _>("created_at"),
-                        "last_login_at": row.get::<Option<chrono::DateTime<chrono::Utc>>, _>("last_login_at")
-                    })
-                }).collect();
+                let mut users = Vec::new();
                 
-                info!("✅ Returning {} users to frontend", users.len());
+                for (index, row) in rows.iter().enumerate() {
+                    info!("🔄 Processing user row {} of {}", index + 1, rows.len());
+                    
+                    // Extract fields with individual error handling
+                    let user_id = row.get::<Uuid, _>("id").to_string();
+                    let username = row.get::<String, _>("username");
+                    let email = row.get::<String, _>("email");
+                    let status = row.get::<String, _>("status");
+                    let created_at = row.get::<chrono::DateTime<chrono::Utc>, _>("created_at").to_rfc3339();
+                    let last_login_at = row.get::<Option<chrono::DateTime<chrono::Utc>>, _>("last_login_at")
+                        .map(|dt| dt.to_rfc3339());
+                    
+                    info!("📋 User data extracted - ID: {}, Username: {}, Email: {}, Status: {}", 
+                          user_id, username, email, status);
+                    
+                    let user_json = serde_json::json!({
+                        "id": user_id,
+                        "username": username,
+                        "email": email,
+                        "status": status,
+                        "created_at": created_at,
+                        "last_login_at": last_login_at
+                    });
+                    
+                    info!("✅ Successfully processed user: {}", username);
+                    users.push(user_json);
+                }
+                
+                info!("✅ Successfully processed all {} users, returning to frontend", users.len());
                 HttpResponse::Ok().json(serde_json::json!({
                     "success": true,
                     "users": users
