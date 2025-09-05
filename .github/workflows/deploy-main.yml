@@ -86,7 +86,7 @@ jobs:
           
           # Force stop any running containers with our names
           echo "🛑 Force stopping any running containers..."
-          docker stop viworks-backend viworks-frontend viworks-postgres viworks-redis 2>/dev/null || true
+          docker stop viworks-backend viworks-frontend viworks-postgres viworks-redis viworks-nginx 2>/dev/null || true
           
           # Remove containers with our specific names
           echo "🧹 Removing containers with specific names..."
@@ -94,6 +94,7 @@ jobs:
           remove_container "viworks-frontend"
           remove_container "viworks-postgres"
           remove_container "viworks-redis"
+          remove_container "viworks-nginx"
           
           # Remove any orphaned containers
           echo "🧹 Removing orphaned containers..."
@@ -110,7 +111,7 @@ jobs:
           
           # Verify no conflicting containers exist
           echo "🔍 Verifying no conflicting containers exist..."
-          if container_exists "viworks-backend" || container_exists "viworks-frontend" || container_exists "viworks-postgres" || container_exists "viworks-redis"; then
+          if container_exists "viworks-backend" || container_exists "viworks-frontend" || container_exists "viworks-postgres" || container_exists "viworks-redis" || container_exists "viworks-nginx"; then
               echo "❌ Error: Conflicting containers still exist. Manual cleanup required."
               docker ps -a | grep viworks
               exit 1
