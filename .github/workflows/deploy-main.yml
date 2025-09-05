@@ -124,16 +124,14 @@ jobs:
           git reset --hard origin/main || git reset --hard origin/master
           git clean -fd
           
-          # Add new remote if it doesn't exist
-          if ! git remote get-url new-origin >/dev/null 2>&1; then
-              echo "🔗 Adding new repository remote..."
-              git remote add new-origin https://github.com/shaiannazari/viworksolution.git
-          fi
+          # Update origin to point to new repository
+          echo "🔗 Updating repository remote to new location..."
+          git remote set-url origin https://github.com/shaiannazari/viworksolution.git
           
           # Fetch from new repository and reset to it
           echo "🔄 Fetching from new repository..."
-          git fetch new-origin
-          git reset --hard new-origin/main
+          git fetch origin
+          git reset --hard origin/main
           
           # Navigate to the clean docker setup
           cd "digital ocean docker"
