@@ -37,7 +37,7 @@ impl ConnectionManager {
         info!("🚀 [CONNECT] Starting connection to Backend Agent");
         info!("🚀 [CONNECT] Backend URL: {}", self.config.outbound.backend_url);
         info!("🚀 [CONNECT] Agent ID: {}", self.config.outbound.agent_id);
-        info!("🚀 [CONNECT] Site: {}", self.config.outbound.site);
+        info!("🚀 [CONNECT] Site: {:?}", self.config.outbound.site);
         
         let url = Url::parse(&self.config.outbound.backend_url)
             .map_err(|e| {
@@ -50,7 +50,7 @@ impl ConnectionManager {
 
         // For now, we'll use a simple WebSocket connection
         // In production, this should include mTLS client certificates
-        let (ws_stream, _) = connect_async(url)
+        let (mut ws_stream, _) = connect_async(url)
             .await
             .map_err(|e| {
                 error!("❌ [CONNECT] WebSocket connection failed: {}", e);
@@ -111,7 +111,7 @@ impl ConnectionManager {
             }
         });
 
-        info!("🔗 [HELLO] Payload created - Agent ID: {}, Site: {}, Version: {}", 
+        info!("🔗 [HELLO] Payload created - Agent ID: {}, Site: {:?}, Version: {}", 
               self.config.outbound.agent_id, 
               self.config.outbound.site, 
               env!("CARGO_PKG_VERSION"));
@@ -130,7 +130,7 @@ impl ConnectionManager {
         let message_text = serde_json::to_string(&hello_message)
             .map_err(|e| {
                 error!("❌ [HELLO] Failed to serialize HELLO message: {}", e);
-                AgentError::Serialization(format!("Failed to serialize HELLO message: {}", e))
+                AgentError::InternalError(format!("Failed to serialize HELLO message: {}", e))
             })?;
         
         info!("🔗 [HELLO] Message serialized successfully, length: {} bytes", message_text.len());
@@ -160,7 +160,7 @@ impl ConnectionManager {
         
         // Send the telemetry message through the WebSocket
         let message_text = serde_json::to_string(&telemetry_message)
-            .map_err(|e| AgentError::Serialization(format!("Failed to serialize telemetry message: {}", e)))?;
+            .map_err(|e| AgentError::InternalError(format!("Failed to serialize telemetry message: {}", e)))?;
         
         ws_stream.send(Message::Text(message_text)).await
             .map_err(|e| AgentError::ConnectionError(format!("Failed to send telemetry message: {}", e)))?;
@@ -198,7 +198,7 @@ impl ConnectionManager {
             }
         });
 
-        info!("📊 [TELEMETRY] Payload created - Agent ID: {}, Site: {}, Timestamp: {}", 
+        info!("📊 [TELEMETRY] Payload created - Agent ID: {}, Site: {:?}, Timestamp: {}", 
               self.config.outbound.agent_id, 
               self.config.outbound.site, 
               chrono::Utc::now().to_rfc3339());
@@ -217,7 +217,7 @@ impl ConnectionManager {
         let message_text = serde_json::to_string(&telemetry_message)
             .map_err(|e| {
                 error!("❌ [TELEMETRY] Failed to serialize telemetry message: {}", e);
-                AgentError::Serialization(format!("Failed to serialize telemetry message: {}", e))
+                AgentError::InternalError(format!("Failed to serialize telemetry message: {}", e))
             })?;
         
         info!("📊 [TELEMETRY] Message serialized successfully, length: {} bytes", message_text.len());
