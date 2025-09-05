@@ -57,6 +57,9 @@ impl AgentManager {
             "Starting Agent Manager WebSocket server on {}",
             bind_address
         );
+        
+        info!("DEBUG: Agent management config - bind_address: {}, port: {}", 
+              self.config.agent_management.bind_address, self.config.agent_management.port);
 
         let listener = TcpListener::bind(&bind_address).await.map_err(|e| {
             error!("Failed to bind WebSocket server: {}", e);
