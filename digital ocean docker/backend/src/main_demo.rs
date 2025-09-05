@@ -218,7 +218,7 @@ async fn challenge_verify(req: web::Json<ChallengeVerifyRequest>) -> HttpRespons
     }
 }
 
-async fn device_bind_request(req: web::Json<DeviceBindRequest>) -> HttpResponse {
+async fn device_bind_request(_req: web::Json<DeviceBindRequest>) -> HttpResponse {
     HttpResponse::Ok().json(serde_json::json!({
         "success": true,
         "message": "Device binding request submitted",
@@ -226,9 +226,9 @@ async fn device_bind_request(req: web::Json<DeviceBindRequest>) -> HttpResponse 
     }))
 }
 
-async fn client_bootstrap(req: web::Json<ClientBootstrapRequest>, http_req: actix_web::HttpRequest) -> HttpResponse {
+async fn client_bootstrap(_req: web::Json<ClientBootstrapRequest>, _http_req: actix_web::HttpRequest) -> HttpResponse {
     // Check Authorization header
-    let auth_header = http_req.headers().get("Authorization");
+    let auth_header = _http_req.headers().get("Authorization");
     if auth_header.is_none() {
         return HttpResponse::Unauthorized().json(serde_json::json!({
             "error": "Missing authorization header"
@@ -264,14 +264,14 @@ async fn client_bootstrap(req: web::Json<ClientBootstrapRequest>, http_req: acti
     HttpResponse::Ok().json(response)
 }
 
-async fn create_user(req: web::Json<CreateUserRequest>) -> HttpResponse {
+async fn create_user(_req: web::Json<CreateUserRequest>) -> HttpResponse {
     HttpResponse::Ok().json(serde_json::json!({
         "ok": true,
         "message": "VPN user created successfully"
     }))
 }
 
-async fn spawn_container(req: web::Json<SpawnContainerRequest>) -> HttpResponse {
+async fn spawn_container(_req: web::Json<SpawnContainerRequest>) -> HttpResponse {
     let random_path = generate_random_path();
     let port = 5801;
     let container_id = format!("firefox-{}", port);
@@ -284,7 +284,7 @@ async fn spawn_container(req: web::Json<SpawnContainerRequest>) -> HttpResponse 
     }))
 }
 
-async fn terminate_session(req: web::Json<TerminateSessionRequest>) -> HttpResponse {
+async fn terminate_session(_req: web::Json<TerminateSessionRequest>) -> HttpResponse {
     HttpResponse::Ok().json(serde_json::json!({
         "terminated": true,
         "message": "Session terminated successfully"
@@ -482,7 +482,7 @@ async fn main() -> std::io::Result<()> {
                 }))
             }))
     })
-    .bind((host, port))?;
+    .bind((host.clone(), port))?;
 
     log::info!("🚀 Server configured, starting...");
     info!("🚀 Server configured, starting...");
