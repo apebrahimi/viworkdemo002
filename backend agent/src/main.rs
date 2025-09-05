@@ -140,7 +140,7 @@ async fn main() -> BackendAgentResult<()> {
     info!("Creating full API server...");
     let server = HttpServer::new(move || {
         info!("Creating full App instance");
-        
+
         let cors = Cors::default()
             .allow_any_origin()
             .allow_any_method()
@@ -158,7 +158,9 @@ async fn main() -> BackendAgentResult<()> {
     })
     .workers(server_config.workers)
     .max_connections(server_config.max_connections)
-    .client_request_timeout(std::time::Duration::from_secs(server_config.request_timeout))
+    .client_request_timeout(std::time::Duration::from_secs(
+        server_config.request_timeout,
+    ))
     .keep_alive(std::time::Duration::from_secs(30))
     .shutdown_timeout(30)
     .disable_signals();
