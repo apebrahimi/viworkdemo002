@@ -65,7 +65,9 @@ where
                     match message {
                         Some(Ok(Message::Text(text))) => {
                             debug!("Received text message: {}", text);
-                            // TODO: Process incoming messages
+                            if let Err(e) = self.handle_text_message(&text).await {
+                                error!("Failed to handle text message: {}", e);
+                            }
                         }
                         Some(Ok(Message::Binary(data))) => {
                             debug!("Received binary message of {} bytes", data.len());
