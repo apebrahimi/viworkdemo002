@@ -4,9 +4,9 @@ use crate::config::Config;
 use crate::data::models::{AgentInfo, AgentStatus, CommandMessage, WebSocketMessage};
 use crate::data::DataLayer;
 use crate::error::BackendAgentResult;
-use actix_web::{middleware::Logger, web, App, HttpServer, HttpRequest, HttpResponse, Error};
-use actix_web_actors::ws::{self, Message, ProtocolError, WebsocketContext};
 use actix::{Actor, ActorContext, StreamHandler};
+use actix_web::{middleware::Logger, web, App, Error, HttpRequest, HttpResponse, HttpServer};
+use actix_web_actors::ws::{self, Message, ProtocolError, WebsocketContext};
 use dashmap::DashMap;
 use std::sync::Arc;
 use std::time::Duration;
@@ -80,7 +80,6 @@ impl AgentManager {
         // Close all connections
         self.close_all_connections().await?;
 
-
         info!("Agent Manager stopped successfully");
         Ok(())
     }
@@ -126,7 +125,6 @@ impl AgentManager {
         info!("HTTP server stopped");
         Ok(())
     }
-
 
     /// Send a command to a specific agent
     pub async fn send_command_to_agent(
@@ -528,4 +526,3 @@ impl StreamHandler<Result<Message, ProtocolError>> for AgentWebSocketActor {
         }
     }
 }
-
