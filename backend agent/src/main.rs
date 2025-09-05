@@ -136,46 +136,56 @@ async fn main() -> BackendAgentResult<()> {
     let server_config = config.server.clone();
     info!("Creating HttpServer with config: {:?}", server_config);
 
-    // Create minimal test server first
-    info!("Creating minimal test server...");
-    let test_server = HttpServer::new(|| {
-        info!("Creating minimal App instance");
-        App::new().wrap(Logger::default()).route(
-            "/health",
-            web::get()
-                .to(|| async { HttpResponse::Ok().json(serde_json::json!({"status": "healthy"})) }),
-        )
+    // Create full API server
+    info!("Creating full API server...");
+    let server = HttpServer::new(move || {
+        info!("Creating full App instance");
+        
+        let cors = Cors::default()
+            .allow_any_origin()
+            .allow_any_method()
+            .allow_any_header()
+            .max_age(3600);
+
+        App::new()
+            .wrap(Logger::default())
+            .wrap(cors)
+            .app_data(web::Data::new(data_layer_for_server.clone()))
+            .app_data(web::Data::new(command_engine_arc.clone()))
+            .app_data(web::Data::new(telemetry_processor_arc.clone()))
+            .app_data(web::Data::new(agent_manager_arc.clone()))
+            .configure(api::routes::configure_routes)
     })
-    .workers(1)
-    .max_connections(100)
-    .client_request_timeout(std::time::Duration::from_secs(30))
+    .workers(server_config.workers)
+    .max_connections(server_config.max_connections)
+    .client_request_timeout(std::time::Duration::from_secs(server_config.request_timeout))
     .keep_alive(std::time::Duration::from_secs(30))
     .shutdown_timeout(30)
     .disable_signals();
 
     info!(
-        "Test server created, attempting to bind to {}",
+        "Full API server created, attempting to bind to {}",
         bind_address
     );
 
-    let test_server = test_server.bind(&bind_address).map_err(|e| {
-        error!("Failed to bind test server to {}: {}", bind_address, e);
-        error::BackendAgentError::Internal(format!("Failed to bind test server: {}", e))
+    let server = server.bind(&bind_address).map_err(|e| {
+        error!("Failed to bind server to {}: {}", bind_address, e);
+        error::BackendAgentError::Internal(format!("Failed to bind server: {}", e))
     })?;
 
-    info!("Test server bound successfully to {}", bind_address);
-    info!("Test server started successfully");
+    info!("Full API server bound successfully to {}", bind_address);
+    info!("Full API server started successfully");
 
-    // Start the test server with panic handling
-    info!("Calling test_server.run()...");
+    // Start the server with panic handling
+    info!("Calling server.run()...");
 
     // Set up panic hook to catch any panics
     std::panic::set_hook(Box::new(|panic_info| {
-        error!("Test server panic: {:?}", panic_info);
+        error!("Server panic: {:?}", panic_info);
     }));
 
-    let test_server_handle = test_server.run();
-    info!("Test server handle created, waiting for events...");
+    let server_handle = server.run();
+    info!("Server handle created, waiting for events...");
 
     // Wait for shutdown signal or server error
     info!("Starting server and waiting for shutdown signal...");
@@ -184,7 +194,7 @@ async fn main() -> BackendAgentResult<()> {
     let shutdown_future = shutdown_signal();
 
     tokio::select! {
-        result = test_server_handle => {
+        result = server_handle => {
             match result {
                 Ok(_) => info!("Server completed successfully"),
                 Err(e) => error!("Server error: {}", e),
