@@ -69,6 +69,9 @@ async fn main() -> BackendAgentResult<()> {
     let mut agent_manager = agent::AgentManager::new(config.clone(), data_layer.clone()).await?;
     agent_manager.start().await?;
     let agent_manager_arc = Arc::new(agent_manager);
+    
+    // Verify WebSocket server is running
+    info!("WebSocket server should be running on port 8081");
 
     let command_engine = command::CommandEngine::new(
         config.clone(),

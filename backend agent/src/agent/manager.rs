@@ -23,7 +23,7 @@ pub struct AgentManager {
         Arc<DashMap<AgentConnectionId, Arc<RwLock<AgentConnection<tokio::net::TcpStream>>>>>,
     pub config: Config,
     pub is_running: Arc<RwLock<bool>>,
-    pub listener: Option<TcpListener>,
+    pub listener: Option<Arc<TcpListener>>,
 }
 
 impl AgentManager {
@@ -71,7 +71,7 @@ impl AgentManager {
             ))
         })?;
 
-        self.listener = Some(listener);
+        self.listener = Some(Arc::new(listener));
 
         {
             let mut running = self.is_running.write().await;
@@ -115,7 +115,7 @@ impl AgentManager {
         info!("Agent Manager server loop started, accepting connections...");
 
         while *self.is_running.read().await {
-            match listener.accept().await {
+            match listener.as_ref().accept().await {
                 Ok((stream, addr)) => {
                     info!("New connection from {}", addr);
 
