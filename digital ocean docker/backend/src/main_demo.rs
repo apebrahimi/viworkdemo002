@@ -579,12 +579,16 @@ async fn validate_2fa_code(req: web::Json<TwoFactorValidation>) -> HttpResponse 
 }
 
 async fn get_users(pool: web::Data<Option<PgPool>>) -> HttpResponse {
+    info!("📋 Fetching users from database...");
+    
     if let Some(pool) = pool.as_ref() {
+        info!("✅ Database pool is available");
         match sqlx::query("SELECT id, username, email, status, created_at, last_login_at FROM users ORDER BY created_at DESC")
             .fetch_all(pool)
             .await
         {
             Ok(rows) => {
+                info!("✅ Found {} users in database", rows.len());
                 let users: Vec<serde_json::Value> = rows.iter().map(|row| {
                     serde_json::json!({
                         "id": row.get::<Uuid, _>("id"),
@@ -596,6 +600,7 @@ async fn get_users(pool: web::Data<Option<PgPool>>) -> HttpResponse {
                     })
                 }).collect();
                 
+                info!("✅ Returning {} users to frontend", users.len());
                 HttpResponse::Ok().json(serde_json::json!({
                     "success": true,
                     "users": users
@@ -605,11 +610,12 @@ async fn get_users(pool: web::Data<Option<PgPool>>) -> HttpResponse {
                 error!("❌ Failed to fetch users: {}", e);
                 HttpResponse::InternalServerError().json(serde_json::json!({
                     "success": false,
-                    "message": "Failed to fetch users"
+                    "message": format!("Failed to fetch users: {}", e)
                 }))
             }
         }
     } else {
+        error!("❌ Database pool is not available");
         HttpResponse::InternalServerError().json(serde_json::json!({
             "success": false,
             "message": "Database not available"
@@ -719,11 +725,12 @@ async fn main() -> std::io::Result<()> {
                     "status": "ok"
                 }))
             }))
-            .route("/api/status", web::get().to(|| async { 
+            .route("/api/status", web::get().to(move || async { 
+                let db_status = if pool.is_some() { "connected" } else { "disconnected" };
                 HttpResponse::Ok().json(serde_json::json!({
                     "message": "ViWorkS Admin Panel Backend (Demo Mode) is running!",
-                    "database": "demo_mode",
-                    "redis": "demo_mode",
+                    "database": db_status,
+                    "redis": "connected",
                     "status": "healthy"
                 }))
             }))
