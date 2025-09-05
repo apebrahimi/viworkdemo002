@@ -340,23 +340,19 @@ async fn main() -> std::io::Result<()> {
         std::process::exit(1);
     }));
 
-    // Initialize basic logging immediately (before any complex operations)
-    env_logger::init();
-    log::info!("🚀 Starting ViWorkS Admin Panel Backend (Demo Mode)");
-    log::info!("🔧 Environment: HOST={}, PORT={}", 
-        std::env::var("HOST").unwrap_or_else(|_| "0.0.0.0".to_string()),
-        std::env::var("PORT").unwrap_or_else(|_| "8081".to_string())
-    );
-
-    // Then initialize more complex logging
+    // Initialize logging system (use tracing-subscriber only to avoid conflicts)
     tracing_subscriber::registry()
         .with(tracing_subscriber::EnvFilter::new(
             std::env::var("RUST_LOG").unwrap_or_else(|_| "info".into()),
         ))
         .with(tracing_subscriber::fmt::layer())
         .init();
-
+    
     info!("🚀 Starting ViWorkS Admin Panel Backend (Demo Mode)");
+    info!("🔧 Environment: HOST={}, PORT={}", 
+        std::env::var("HOST").unwrap_or_else(|_| "0.0.0.0".to_string()),
+        std::env::var("PORT").unwrap_or_else(|_| "8081".to_string())
+    );
 
     let host = std::env::var("HOST").unwrap_or_else(|_| "0.0.0.0".to_string());
     let port = std::env::var("PORT")
@@ -364,11 +360,10 @@ async fn main() -> std::io::Result<()> {
         .parse::<u16>()
         .unwrap_or(8081);
     
-    log::info!("🌐 Starting HTTP server on {}:{}", host, port);
     info!("🌐 Starting HTTP server on {}:{}", host, port);
 
     // Start HTTP server with error handling
-    log::info!("🔧 Creating HTTP server...");
+    info!("🔧 Creating HTTP server...");
     let server = HttpServer::new(|| {
         let cors = Cors::default()
             .allow_any_origin()
@@ -484,11 +479,9 @@ async fn main() -> std::io::Result<()> {
     })
     .bind((host.clone(), port))?;
 
-    log::info!("🚀 Server configured, starting...");
     info!("🚀 Server configured, starting...");
     
     // Start the server and await it (this keeps the process running)
-    log::info!("✅ ViWorkS Backend is now running on {}:{}", host, port);
     info!("✅ ViWorkS Backend is now running on {}:{}", host, port);
     
     server.run().await
