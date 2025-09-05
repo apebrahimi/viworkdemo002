@@ -2,7 +2,7 @@ pub mod models;
 pub mod postgres;
 pub mod redis;
 
-pub use models::*;
+// pub use models::*;
 pub use postgres::PostgresClient;
 pub use redis::RedisClient;
 

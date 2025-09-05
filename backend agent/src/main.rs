@@ -1,5 +1,5 @@
 use actix_cors::Cors;
-use actix_web::{middleware::Logger, web, App, HttpResponse, HttpServer};
+use actix_web::{middleware::Logger, web, App, HttpServer};
 use clap::Parser;
 use tokio::signal;
 use tracing::{error, info};

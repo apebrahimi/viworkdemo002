@@ -2,9 +2,7 @@ use crate::data::models::{AgentInfo, AgentStatus};
 use crate::error::BackendAgentResult;
 use dashmap::DashMap;
 use std::sync::Arc;
-use tokio::sync::RwLock;
-use tracing::{debug, error, info, warn};
-use uuid::Uuid;
+use tracing::{debug, info, warn};
 
 #[derive(Debug, Clone)]
 pub struct AgentRegistry {

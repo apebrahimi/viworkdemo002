@@ -1,11 +1,9 @@
 use crate::agent::connection::AgentConnectionId;
 use crate::agent::{AgentConnection, AgentRegistry};
-use crate::command::CommandEngine;
 use crate::config::Config;
 use crate::data::models::{AgentInfo, AgentStatus, CommandMessage, WebSocketMessage};
 use crate::data::DataLayer;
 use crate::error::BackendAgentResult;
-use crate::telemetry::TelemetryProcessor;
 use actix_web::{middleware::Logger, web, App, HttpServer, HttpRequest, HttpResponse, Error};
 use actix_web_actors::ws::{self, Message, ProtocolError, WebsocketContext};
 use actix::{Actor, ActorContext, StreamHandler};
@@ -15,7 +13,8 @@ use std::time::Duration;
 use tokio::sync::RwLock;
 use tracing::{debug, error, info, warn};
 
-type AgentConnections = Arc<DashMap<AgentConnectionId, Arc<RwLock<AgentConnection<tokio::net::TcpStream>>>>>;
+type AgentConnections =
+    Arc<DashMap<AgentConnectionId, Arc<RwLock<AgentConnection<tokio::net::TcpStream>>>>>;
 
 pub struct AgentManager {
     pub registry: Arc<AgentRegistry>,
@@ -93,7 +92,10 @@ impl AgentManager {
             self.config.agent_management.bind_address, self.config.agent_management.port
         );
 
-        info!("Starting HTTP server with WebSocket support on {}", bind_address);
+        info!(
+            "Starting HTTP server with WebSocket support on {}",
+            bind_address
+        );
 
         let registry = self.registry.clone();
         let connections = self.connections.clone();
@@ -133,7 +135,7 @@ impl AgentManager {
         command: CommandMessage,
     ) -> BackendAgentResult<()> {
         // Get agent info
-        let agent_info =
+        let _agent_info =
             self.registry.get_agent(agent_id).await.ok_or_else(|| {
                 crate::error::BackendAgentError::AgentNotFound(agent_id.to_string())
             })?;
@@ -379,7 +381,7 @@ impl AgentManager {
         // Cleanup task
         let cleanup_task = {
             let registry = registry.clone();
-            let config = config.clone();
+            let _config = config.clone();
 
             tokio::spawn(async move {
                 let mut interval = tokio::time::interval(Duration::from_secs(300)); // Every 5 minutes
@@ -463,8 +465,12 @@ async fn websocket_handler(
     connections: web::Data<AgentConnections>,
     config: web::Data<Config>,
 ) -> Result<HttpResponse, Error> {
-    info!("WebSocket connection request from {}", req.peer_addr().unwrap_or_else(|| "unknown".parse().unwrap()));
-    
+    info!(
+        "WebSocket connection request from {}",
+        req.peer_addr()
+            .unwrap_or_else(|| "unknown".parse().unwrap())
+    );
+
     let resp = ws::start(
         AgentWebSocketActor {
             registry: registry.get_ref().clone(),
@@ -474,7 +480,7 @@ async fn websocket_handler(
         &req,
         stream,
     )?;
-    
+
     Ok(resp)
 }
 
