@@ -49,13 +49,20 @@ impl ConnectionManager {
         info!("🚀 [CONNECT] Attempting WebSocket connection...");
 
         // For now, we'll use a simple WebSocket connection
-        // In production, this should include mTLS client certificates
-        let (mut ws_stream, _) = connect_async(url)
-            .await
-            .map_err(|e| {
-                error!("❌ [CONNECT] WebSocket connection failed: {}", e);
-                AgentError::ConnectionError(format!("WebSocket connection failed: {}", e))
-            })?;
+        // In production, this should include proper mTLS client certificates
+        let (mut ws_stream, _) = tokio::time::timeout(
+            Duration::from_secs(30),
+            connect_async(url)
+        )
+        .await
+        .map_err(|_| {
+            error!("❌ [CONNECT] WebSocket connection timeout after 30 seconds");
+            AgentError::ConnectionError("WebSocket connection timeout".to_string())
+        })?
+        .map_err(|e| {
+            error!("❌ [CONNECT] WebSocket connection failed: {}", e);
+            AgentError::ConnectionError(format!("WebSocket connection failed: {}", e))
+        })?;
 
         info!("✅ [CONNECT] WebSocket connection established successfully");
         info!("🚀 [CONNECT] Sending HELLO frame to Backend Agent...");

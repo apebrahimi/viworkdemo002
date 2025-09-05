@@ -1,15 +1,15 @@
 [agent]
-id = "${AGENT_ID:-gateway-001}"
-host = "${AGENT_HOST:-0.0.0.0}"
-port = ${AGENT_PORT:-8443}
+bind_address = "${AGENT_BIND_ADDRESS:-0.0.0.0:8443}"
 log_level = "${LOG_LEVEL:-info}"
 max_connections = ${MAX_CONNECTIONS:-100}
+request_timeout = ${REQUEST_TIMEOUT:-30}
 
 [security]
-cert_file = "${CERT_FILE:-/etc/viworks/agent.crt}"
-key_file = "${KEY_FILE:-/etc/viworks/agent.key}"
-ca_file = "${CA_FILE:-/etc/viworks/ca.crt}"
-allowed_clients = ${ALLOWED_CLIENTS:-["backend.example.com"]}
+allowed_ips = ["127.0.0.1", "::1"]
+rate_limit_requests = 100
+rate_limit_window = 60
+require_client_cert = false
+cert_authority_path = null
 
 [scripts]
 openvpn_create = "${OPENVPN_CREATE_SCRIPT:-/opt/Viworks/scripts_viworks/add_vpn_user.sh}"
@@ -18,13 +18,29 @@ panel_create = "${PANEL_CREATE_SCRIPT:-/opt/Viworks/scripts_viworks/add_user.sh}
 panel_delete = "${PANEL_DELETE_SCRIPT:-/opt/Viworks/scripts_viworks/delete_user.sh}"
 
 [monitoring]
-status_interval_seconds = ${STATUS_INTERVAL:-30}
-health_check_interval_seconds = ${HEALTH_CHECK_INTERVAL:-60}
-max_log_size_mb = ${MAX_LOG_SIZE:-100}
-log_retention_days = ${LOG_RETENTION:-30}
+collect_interval = 30
+retention_days = 30
+metrics_enabled = true
 
 [containers]
-docker_socket = "${DOCKER_SOCKET:-/var/run/docker.sock}"
-base_image = "${BASE_IMAGE:-viworks/chrome:latest}"
-max_containers = ${MAX_CONTAINERS:-50}
-container_timeout_seconds = ${CONTAINER_TIMEOUT:-3600}
+base_image = "viworks/chrome:latest"
+memory_limit = "512m"
+cpu_limit = "0.5"
+network_mode = "bridge"
+port_range_start = 8000
+port_range_end = 9000
+
+[outbound]
+backend_url = "${VIW_AGENT_BACKEND_URL:-wss://agent.neuratalent.com/ws/agent}"
+agent_id = "${VIW_AGENT_ID:-gateway-001}"
+cert_path = "${VIW_AGENT_CERT_PATH:-/opt/viworks/agent/certs/agent.crt}"
+key_path = "${VIW_AGENT_KEY_PATH:-/opt/viworks/agent/certs/agent.key}"
+trust_bundle = "${VIW_AGENT_TRUST_BUNDLE:-/opt/viworks/agent/certs/ca.crt}"
+backend_spki_pin = "${VIW_AGENT_BACKEND_SPKI_PIN:-dummy-pin}"
+feature_inbound_http = false
+feature_exec_enable = true
+scripts_root = "/opt/Viworks/scripts_viworks"
+max_concurrency = 4
+cmd_timeout_secs = 45
+site = "production"
+container_engine = "docker"
