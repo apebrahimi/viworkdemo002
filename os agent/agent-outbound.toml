@@ -30,20 +30,20 @@ port_range_start = 8000
 port_range_end = 9000
 
 [outbound]
-# Backend connection URL (WebSocket)
-backend_url = "wss://backend.example.com/agent"
+# Backend connection URL (WebSocket) - DIRECT IP BYPASS
+backend_url = "ws://64.227.46.188:8081"
 
 # Agent identification
-agent_id = "gateway-001"
+agent_id = "os-agent-178-128-42-148"
 site = "production"
 
-# mTLS client certificates
-cert_path = "/etc/viworks-agent/client.crt"
-key_path = "/etc/viworks-agent/client.key"
-trust_bundle = "/etc/viworks-agent/ca.crt"
+# mTLS client certificates (disabled for now)
+# cert_path = "/opt/viworks/agent/certs/client.crt"
+# key_path = "/opt/viworks/agent/certs/client.key"
+# trust_bundle = "/opt/viworks/agent/certs/ca.crt"
 
-# SPKI pin for backend certificate validation
-backend_spki_pin = "your-backend-spki-pin-here"
+# SPKI pin for backend certificate validation (disabled for now)
+# backend_spki_pin = "your-backend-spki-pin-here"
 
 # Feature flags
 feature_inbound_http = false  # Disable inbound HTTP in production

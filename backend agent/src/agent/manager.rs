@@ -6,24 +6,22 @@ use crate::data::models::{AgentInfo, AgentStatus, CommandMessage, WebSocketMessa
 use crate::data::DataLayer;
 use crate::error::BackendAgentResult;
 use crate::telemetry::TelemetryProcessor;
-use actix_web::{middleware::Logger, web, App, HttpServer};
+use actix_web::{middleware::Logger, web, App, HttpServer, HttpRequest, HttpResponse, Error};
+use actix_web_actors::ws::{self, Message, ProtocolError, WebsocketContext};
+use actix::{Actor, ActorContext, StreamHandler};
 use dashmap::DashMap;
-use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::net::TcpListener;
 use tokio::sync::RwLock;
-use tokio_tungstenite::tungstenite::handshake::server::Callback;
-use tokio_tungstenite::{accept_async, WebSocketStream};
 use tracing::{debug, error, info, warn};
+
+type AgentConnections = Arc<DashMap<AgentConnectionId, Arc<RwLock<AgentConnection<tokio::net::TcpStream>>>>>;
 
 pub struct AgentManager {
     pub registry: Arc<AgentRegistry>,
-    pub connections:
-        Arc<DashMap<AgentConnectionId, Arc<RwLock<AgentConnection<tokio::net::TcpStream>>>>>,
+    pub connections: AgentConnections,
     pub config: Config,
     pub is_running: Arc<RwLock<bool>>,
-    pub listener: Option<Arc<TcpListener>>,
 }
 
 impl AgentManager {
@@ -39,7 +37,6 @@ impl AgentManager {
             registry,
             connections,
             is_running,
-            listener: None,
         };
 
         info!("Agent Manager initialized successfully");
@@ -63,16 +60,6 @@ impl AgentManager {
             self.config.agent_management.bind_address, self.config.agent_management.port
         );
 
-        let listener = TcpListener::bind(&bind_address).await.map_err(|e| {
-            error!("Failed to bind WebSocket server: {}", e);
-            crate::error::BackendAgentError::Internal(format!(
-                "Failed to bind WebSocket server: {}",
-                e
-            ))
-        })?;
-
-        self.listener = Some(Arc::new(listener));
-
         {
             let mut running = self.is_running.write().await;
             *running = true;
@@ -94,99 +81,50 @@ impl AgentManager {
         // Close all connections
         self.close_all_connections().await?;
 
-        // Close listener
-        if let Some(listener) = self.listener.take() {
-            drop(listener);
-        }
 
         info!("Agent Manager stopped successfully");
         Ok(())
     }
 
-    /// Run the main server loop
+    /// Run the HTTP server with WebSocket support
     pub async fn run_server_loop(&self) -> BackendAgentResult<()> {
-        let listener = self.listener.as_ref().ok_or_else(|| {
-            error!("WebSocket server not started - listener is None");
-            crate::error::BackendAgentError::Internal("WebSocket server not started".to_string())
+        let bind_address = format!(
+            "{}:{}",
+            self.config.agent_management.bind_address, self.config.agent_management.port
+        );
+
+        info!("Starting HTTP server with WebSocket support on {}", bind_address);
+
+        let registry = self.registry.clone();
+        let connections = self.connections.clone();
+        let config = self.config.clone();
+
+        let server = HttpServer::new(move || {
+            App::new()
+                .app_data(web::Data::new(registry.clone()))
+                .app_data(web::Data::new(connections.clone()))
+                .app_data(web::Data::new(config.clone()))
+                .route("/", web::get().to(websocket_handler))
+                .wrap(Logger::default())
+        })
+        .bind(&bind_address)
+        .map_err(|e| {
+            error!("Failed to bind HTTP server: {}", e);
+            crate::error::BackendAgentError::Internal(format!("Failed to bind HTTP server: {}", e))
         })?;
 
-        info!("WebSocket server listener is available, starting server loop...");
+        info!("HTTP server started successfully on {}", bind_address);
 
-        info!("Agent Manager server loop started, accepting connections...");
+        // Run the server
+        server.run().await.map_err(|e| {
+            error!("HTTP server failed: {}", e);
+            crate::error::BackendAgentError::Internal(format!("HTTP server failed: {}", e))
+        })?;
 
-        while *self.is_running.read().await {
-            match listener.as_ref().accept().await {
-                Ok((stream, addr)) => {
-                    info!("New connection from {}", addr);
-
-                    // Spawn a task to handle the connection
-                    let registry = self.registry.clone();
-                    let connections = self.connections.clone();
-                    let config = self.config.clone();
-
-                    tokio::spawn(async move {
-                        if let Err(e) =
-                            Self::handle_new_connection(stream, addr, registry, connections, config)
-                                .await
-                        {
-                            error!("Failed to handle connection from {}: {}", addr, e);
-                        }
-                    });
-                }
-                Err(e) => {
-                    if *self.is_running.read().await {
-                        error!("Failed to accept connection: {}", e);
-                    }
-                    break;
-                }
-            }
-        }
-
-        info!("Agent Manager server loop stopped");
+        info!("HTTP server stopped");
         Ok(())
     }
 
-    /// Handle a new incoming connection
-    async fn handle_new_connection(
-        stream: tokio::net::TcpStream,
-        addr: std::net::SocketAddr,
-        registry: Arc<AgentRegistry>,
-        connections: Arc<
-            DashMap<AgentConnectionId, Arc<RwLock<AgentConnection<tokio::net::TcpStream>>>>,
-        >,
-        config: Config,
-    ) -> BackendAgentResult<()> {
-        // Accept the WebSocket connection
-        let ws_stream = accept_async(stream).await.map_err(|e| {
-            error!("Failed to accept WebSocket connection from {}: {}", addr, e);
-            crate::error::BackendAgentError::WebSocket(format!("WebSocket handshake failed: {}", e))
-        })?;
-
-        info!("WebSocket connection established from {}", addr);
-
-        // Create agent connection
-        let mut connection = AgentConnection::new(ws_stream);
-        let connection_id = connection.id.clone();
-
-        // Store connection
-        connections.insert(connection_id.clone(), Arc::new(RwLock::new(connection)));
-
-        // Handle the connection
-        if let Some(conn) = connections.get(&connection_id) {
-            let mut conn = conn.write().await;
-
-            // Handle the connection lifecycle
-            if let Err(e) = conn.handle_connection().await {
-                error!("Connection handler failed for {}: {}", connection_id, e);
-            }
-        }
-
-        // Clean up connection
-        connections.remove(&connection_id);
-        info!("Connection {} cleaned up", connection_id);
-
-        Ok(())
-    }
 
     /// Send a command to a specific agent
     pub async fn send_command_to_agent(
@@ -517,11 +455,71 @@ impl AgentManager {
     }
 }
 
-impl Drop for AgentManager {
-    fn drop(&mut self) {
-        // Ensure we stop the manager when dropped
-        if let Some(listener) = self.listener.take() {
-            drop(listener);
+/// WebSocket handler for agent connections
+async fn websocket_handler(
+    req: HttpRequest,
+    stream: web::Payload,
+    registry: web::Data<Arc<AgentRegistry>>,
+    connections: web::Data<AgentConnections>,
+    config: web::Data<Config>,
+) -> Result<HttpResponse, Error> {
+    info!("WebSocket connection request from {}", req.peer_addr().unwrap_or_else(|| "unknown".parse().unwrap()));
+    
+    let resp = ws::start(
+        AgentWebSocketActor {
+            registry: registry.get_ref().clone(),
+            connections: connections.get_ref().clone(),
+            config: config.get_ref().clone(),
+        },
+        &req,
+        stream,
+    )?;
+    
+    Ok(resp)
+}
+
+/// WebSocket actor for handling agent connections
+pub struct AgentWebSocketActor {
+    registry: Arc<AgentRegistry>,
+    connections: AgentConnections,
+    config: Config,
+}
+
+impl Actor for AgentWebSocketActor {
+    type Context = WebsocketContext<Self>;
+}
+
+impl StreamHandler<Result<Message, ProtocolError>> for AgentWebSocketActor {
+    fn handle(&mut self, msg: Result<Message, ProtocolError>, ctx: &mut Self::Context) {
+        match msg {
+            Ok(Message::Text(text)) => {
+                info!("Received text message: {}", text);
+                // TODO: Handle the message
+            }
+            Ok(Message::Binary(bin)) => {
+                info!("Received binary message of {} bytes", bin.len());
+            }
+            Ok(Message::Close(reason)) => {
+                info!("WebSocket connection closed: {:?}", reason);
+                ctx.stop();
+            }
+            Ok(Message::Ping(msg)) => {
+                ctx.pong(&msg);
+            }
+            Ok(Message::Pong(_)) => {
+                // Handle pong
+            }
+            Ok(Message::Continuation(_)) => {
+                // Handle continuation frames
+            }
+            Ok(Message::Nop) => {
+                // Handle no-op messages
+            }
+            Err(e) => {
+                error!("WebSocket error: {}", e);
+                ctx.stop();
+            }
         }
     }
 }
+

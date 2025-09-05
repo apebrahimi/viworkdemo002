@@ -127,7 +127,7 @@ impl ConnectionManager {
             "type": "hello",
             "payload": hello_payload,
             "timestamp": chrono::Utc::now(),
-            "correlation_id": null
+            "correlation_id": uuid::Uuid::new_v4().to_string()
         });
 
         info!("🔗 [HELLO] Complete message structure: {}", hello_message);

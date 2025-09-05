@@ -12,6 +12,8 @@ repository = "https://github.com/viworks/backend-agent"
 actix-web = "4.4"
 actix-cors = "0.7"
 actix-web-httpauth = "0.8"
+actix-web-actors = "4.2"
+actix = "0.13"
 actix-rt = "2.11"
 
 # Async Runtime
