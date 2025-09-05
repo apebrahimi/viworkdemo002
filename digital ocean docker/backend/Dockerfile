@@ -80,9 +80,9 @@ USER appuser
 # Expose port
 EXPOSE 8081
 
-# Health check (give server time to initialize DB connection)
-HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=10 \
-    CMD curl -sfm 5 http://localhost:8081/health || exit 1
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --retries=3 \
+    CMD wget -qO- http://127.0.0.1:8081/_healthz || exit 1
 
 # Use dumb-init for proper signal handling
 ENTRYPOINT ["/usr/bin/dumb-init", "--"]

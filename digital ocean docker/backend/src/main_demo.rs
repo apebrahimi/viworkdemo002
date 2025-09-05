@@ -10,6 +10,7 @@ use std::sync::Mutex;
 use once_cell::sync::Lazy;
 use chrono::{Utc, Duration};
 use rand::Rng;
+use std::panic;
 
 // Demo data structures
 #[derive(Debug, Serialize, Deserialize)]
@@ -331,7 +332,23 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWs {
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    // Initialize tracing
+    // Set up panic hook to catch panics and log them
+    panic::set_hook(Box::new(|panic_info| {
+        eprintln!("🚨 Application panicked: {:?}", panic_info);
+        eprintln!("🚨 Location: {:?}", panic_info.location());
+        eprintln!("🚨 Payload: {:?}", panic_info.payload().downcast_ref::<&str>());
+        std::process::exit(1);
+    }));
+
+    // Initialize basic logging immediately (before any complex operations)
+    env_logger::init();
+    log::info!("🚀 Starting ViWorkS Admin Panel Backend (Demo Mode)");
+    log::info!("🔧 Environment: HOST={}, PORT={}", 
+        std::env::var("HOST").unwrap_or_else(|_| "0.0.0.0".to_string()),
+        std::env::var("PORT").unwrap_or_else(|_| "8081".to_string())
+    );
+
+    // Then initialize more complex logging
     tracing_subscriber::registry()
         .with(tracing_subscriber::EnvFilter::new(
             std::env::var("RUST_LOG").unwrap_or_else(|_| "info".into()),
@@ -347,10 +364,12 @@ async fn main() -> std::io::Result<()> {
         .parse::<u16>()
         .unwrap_or(8081);
     
+    log::info!("🌐 Starting HTTP server on {}:{}", host, port);
     info!("🌐 Starting HTTP server on {}:{}", host, port);
 
-    // Start HTTP server
-    HttpServer::new(|| {
+    // Start HTTP server with error handling
+    log::info!("🔧 Creating HTTP server...");
+    let server = HttpServer::new(|| {
         let cors = Cors::default()
             .allow_any_origin()
             .allow_any_method()
@@ -366,6 +385,11 @@ async fn main() -> std::io::Result<()> {
                     "service": "ViWorkS Admin Panel Backend (Demo Mode)",
                     "version": "1.0.0",
                     "message": "Backend is running successfully!"
+                }))
+            }))
+            .route("/_healthz", web::get().to(|| async { 
+                HttpResponse::Ok().json(serde_json::json!({
+                    "status": "ok"
                 }))
             }))
             .route("/api/status", web::get().to(|| async { 
@@ -458,7 +482,14 @@ async fn main() -> std::io::Result<()> {
                 }))
             }))
     })
-    .bind((host, port))?
-    .run()
-    .await
+    .bind((host, port))?;
+
+    log::info!("🚀 Server configured, starting...");
+    info!("🚀 Server configured, starting...");
+    
+    // Start the server and await it (this keeps the process running)
+    log::info!("✅ ViWorkS Backend is now running on {}:{}", host, port);
+    info!("✅ ViWorkS Backend is now running on {}:{}", host, port);
+    
+    server.run().await
 }
