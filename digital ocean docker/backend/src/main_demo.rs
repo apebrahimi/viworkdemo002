@@ -170,6 +170,7 @@ struct DeviceBindRequest {
 #[derive(Debug, Serialize, Deserialize)]
 struct CreateUserRequest {
     username: String,
+    email: String,
     password: String,
 }
 
@@ -478,7 +479,7 @@ async fn register_mobile_device(req: web::Json<DeviceRegistrationRequest>) -> Ht
     
     HttpResponse::Ok().json(DeviceRegistrationResponse {
         success: true,
-        message: "Device registered successfully",
+        message: "Device registered successfully".to_string(),
         device_id: req.device_info.device_id.clone(),
     })
 }
