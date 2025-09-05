@@ -119,20 +119,15 @@ jobs:
           # Navigate back to app directory for git operations
           cd $APP_DIR
           
+          # Update origin to point to new repository using SSH first
+          echo "🔗 Updating repository remote to new location..."
+          git remote set-url origin git@github.com:shaiannazari/viworksolution.git
+          
           # Clean up any existing files and reset git
           echo "🧹 Cleaning up and resetting git repository..."
           git fetch origin
           git reset --hard origin/main || git reset --hard origin/master
           git clean -fd
-          
-          # Update origin to point to new repository using SSH
-          echo "🔗 Updating repository remote to new location..."
-          git remote set-url origin git@github.com:shaiannazari/viworksolution.git
-          
-          # Fetch from new repository and reset to it
-          echo "🔄 Fetching from new repository..."
-          git fetch origin
-          git reset --hard origin/main
           
           # Navigate to the clean docker setup
           cd "digital ocean docker"
