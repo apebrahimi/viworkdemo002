@@ -1,4 +1,4 @@
-name: 🚀 Sequential ViWorks Deployment
+name: 🚀 Sequential ViWorks Deployment (DISABLED)
 
 on:
   workflow_dispatch:
@@ -27,9 +27,9 @@ env:
   DROPLET_USER: ${{ secrets.DROPLET_USER }}
 
 jobs:
-  # Phase 1: Infrastructure (Networks + PostgreSQL + Redis)
+  # DISABLED: This workflow is disabled - use Deploy Backend Agent (Replicated Build Process) instead
   deploy-infrastructure:
-    if: ${{ github.event.inputs.phase == 'all' || github.event.inputs.phase == 'infrastructure' }}
+    if: false  # DISABLED - This workflow should not run
     runs-on: ubuntu-latest
     steps:
     - name: Checkout code
