@@ -6,7 +6,6 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 mod api;
 mod audit;
-mod commands;
 mod config;
 mod docker;
 mod error;
@@ -16,12 +15,11 @@ mod outbound;
 
 use api::{execute_command, health_check, system_status, simple_status};
 use audit::AuditLogger;
-use commands::CommandExecutor;
 use config::Config;
 use docker::DockerManager;
 use monitoring::SystemMonitor;
 use security::SecurityContext;
-use outbound::OutboundManager;
+use outbound::{OutboundManager, executor::CommandExecutor};
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -72,11 +70,7 @@ async fn main() -> std::io::Result<()> {
     info!("main: Audit logger initialized");
 
     info!("main: Initializing command executor...");
-    let command_executor = Arc::new(CommandExecutor::new(
-        config.clone(),
-        docker_manager.clone(),
-        Arc::new(system_monitor.clone()),
-    ));
+    let command_executor = Arc::new(CommandExecutor::new(config.clone()));
     info!("main: Command executor initialized");
 
     // Initialize outbound manager

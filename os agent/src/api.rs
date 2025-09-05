@@ -1,4 +1,4 @@
-use crate::commands::{CommandExecutor, CommandResult};
+use crate::outbound::executor::CommandExecutor;
 use crate::error::{AgentError, AgentResult};
 use actix_web::{web, HttpRequest, HttpResponse};
 use chrono::{DateTime, Utc};

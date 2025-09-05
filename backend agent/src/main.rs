@@ -94,6 +94,16 @@ async fn main() -> BackendAgentResult<()> {
         })
     };
 
+    // Start WebSocket server loop
+    let websocket_server_task = {
+        let agent_manager = agent_manager_arc.clone();
+        tokio::spawn(async move {
+            if let Err(e) = agent_manager.run_server_loop().await {
+                error!("WebSocket server loop failed: {}", e);
+            }
+        })
+    };
+
     let command_bg_task = {
         let command_engine = command_engine_arc.clone();
         tokio::spawn(async move {
@@ -192,6 +202,7 @@ async fn main() -> BackendAgentResult<()> {
 
     // Stop background tasks
     agent_bg_task.abort();
+    websocket_server_task.abort();
     command_bg_task.abort();
     telemetry_bg_task.abort();
     info!("Background tasks stopped");
