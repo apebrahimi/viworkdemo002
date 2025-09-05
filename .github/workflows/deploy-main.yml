@@ -25,6 +25,7 @@ jobs:
           echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -H $DROPLET_IP >> ~/.ssh/known_hosts
+          ssh-keyscan -H github.com >> ~/.ssh/known_hosts
           
       - name: Test SSH connection
         run: |
@@ -124,9 +125,9 @@ jobs:
           git reset --hard origin/main || git reset --hard origin/master
           git clean -fd
           
-          # Update origin to point to new repository
+          # Update origin to point to new repository using SSH
           echo "🔗 Updating repository remote to new location..."
-          git remote set-url origin https://github.com/shaiannazari/viworksolution.git
+          git remote set-url origin git@github.com:shaiannazari/viworksolution.git
           
           # Fetch from new repository and reset to it
           echo "🔄 Fetching from new repository..."
@@ -248,6 +249,17 @@ jobs:
           EOF
           
           chmod +x deploy.sh
+          
+      - name: Copy SSH key to server for git operations
+        run: |
+          scp -i ~/.ssh/id_ed25519 ~/.ssh/id_ed25519 ${DROPLET_USER}@${DROPLET_IP}:/tmp/github_ssh_key
+          ssh -i ~/.ssh/id_ed25519 ${DROPLET_USER}@${DROPLET_IP} "
+            mkdir -p ~/.ssh
+            cp /tmp/github_ssh_key ~/.ssh/id_ed25519
+            chmod 600 ~/.ssh/id_ed25519
+            ssh-keyscan -H github.com >> ~/.ssh/known_hosts
+            rm /tmp/github_ssh_key
+          "
           
       - name: Upload and execute deployment script
         run: |
