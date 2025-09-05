@@ -18,14 +18,14 @@ RUN rustup target add x86_64-unknown-linux-musl
 # Copy Cargo files first for better caching
 COPY Cargo.toml Cargo.lock* ./
 
-# Create a dummy main.rs to build dependencies
-RUN mkdir src && echo "fn main() {}" > src/main.rs
+# Create a dummy main.rs to build dependencies (since Cargo.toml references main_demo.rs)
+RUN mkdir src && echo "fn main() {}" > src/main.rs && echo "fn main() {}" > src/main_demo.rs
 
 # Build dependencies (warm cache)
 RUN cargo build --release
 
-# Remove dummy main.rs and copy real source
-RUN rm src/main.rs
+# Remove dummy files and copy real source
+RUN rm -rf src/*
 COPY src ./src
 COPY migrations ./migrations
 
