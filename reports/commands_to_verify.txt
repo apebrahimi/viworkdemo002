@@ -1,0 +1,156 @@
+# ViWorkS Agent Connectivity Verification Commands
+
+## P0 - Critical Fixes Verification
+
+### 1. Check WebSocket Server is Running
+```bash
+# SSH to backend host
+ssh root@64.227.46.188
+
+# Check if WebSocket server is listening on port 8081
+docker exec viworks-backend-agent-new netstat -tlnp | grep 8081
+# Expected: tcp 0.0.0.0:8081 LISTEN [PID]/viworks-backend-agent
+
+# Test WebSocket server health endpoint
+docker exec viworks-backend-agent-new curl http://localhost:8081/health
+# Expected: {"status":"healthy"}
+```
+
+### 2. Test WebSocket Connection Through Nginx
+```bash
+# Test WebSocket upgrade through Nginx
+curl -vk https://agent.neuratalent.com/ws/agent \
+  -H "Connection: Upgrade" \
+  -H "Upgrade: websocket" \
+  -H "Sec-WebSocket-Version: 13" \
+  -H "Sec-WebSocket-Key: test=="
+# Expected: HTTP 101 Switching Protocols
+```
+
+### 3. Verify Nginx Proxy Configuration
+```bash
+# Check Nginx is proxying to correct port
+ssh root@64.227.46.188 "grep -A 5 'proxy_pass.*viworks-backend-agent-new' /opt/viworks/digital\ ocean\ docker/nginx/nginx.conf"
+# Expected: proxy_pass http://viworks-backend-agent-new:8081;
+```
+
+## P1 - Gateway Agent Deployment Verification
+
+### 4. Check Gateway Agent Service
+```bash
+# SSH to gateway host
+ssh root@178.128.42.148
+
+# Check if ViWorkS agent service is running
+systemctl status viworks-agent
+# Expected: active (running)
+
+# Check agent process
+ps aux | grep viworks-gateway-agent | grep -v grep
+# Expected: Process running with PID
+```
+
+### 5. Check Gateway Agent Logs
+```bash
+# View recent logs
+journalctl -u viworks-agent --since "5 minutes ago"
+# Expected: "Connecting to backend at wss://agent.neuratalent.com/ws/agent"
+
+# Follow logs in real-time
+journalctl -u viworks-agent -f
+# Expected: "WebSocket connection established"
+```
+
+### 6. Test End-to-End Connectivity
+```bash
+# Check if agent appears in backend logs
+ssh root@64.227.46.188 "docker logs viworks-backend-agent-new --tail 20"
+# Expected: "WebSocket connection established from [gateway-ip]"
+
+# Check agent registration
+ssh root@64.227.46.188 "docker exec viworks-backend-agent-new curl http://localhost:8080/api/v1/agents"
+# Expected: JSON with agent information
+```
+
+## P2 - Advanced Verification
+
+### 7. Test WebSocket Message Flow
+```bash
+# Use wscat to test WebSocket connection
+npm install -g wscat
+wscat -c wss://agent.neuratalent.com/ws/agent
+# Expected: Connection established, can send/receive messages
+```
+
+### 8. Check Network Connectivity
+```bash
+# Test DNS resolution from gateway
+ssh root@178.128.42.148 "nslookup agent.neuratalent.com"
+# Expected: 64.227.46.188
+
+# Test port connectivity
+ssh root@178.128.42.148 "telnet agent.neuratalent.com 443"
+# Expected: Connected to agent.neuratalent.com
+```
+
+### 9. Verify SSL/TLS Configuration
+```bash
+# Check certificate details
+openssl s_client -connect agent.neuratalent.com:443 -servername agent.neuratalent.com -showcerts
+# Expected: Valid certificate chain, CN=agent.neuratalent.com
+```
+
+## Troubleshooting Commands
+
+### If WebSocket Server Not Starting
+```bash
+# Check backend agent logs
+ssh root@64.227.46.188 "docker logs viworks-backend-agent-new --tail 50"
+
+# Check if port 8081 is in use
+ssh root@64.227.46.188 "docker exec viworks-backend-agent-new netstat -tlnp | grep 8081"
+
+# Restart backend agent container
+ssh root@64.227.46.188 "docker restart viworks-backend-agent-new"
+```
+
+### If Gateway Agent Not Connecting
+```bash
+# Check gateway agent configuration
+ssh root@178.128.42.148 "cat /opt/viworks/agent/agent-outbound.toml"
+
+# Test connectivity from gateway
+ssh root@178.128.42.148 "curl -vk https://agent.neuratalent.com/health"
+
+# Check firewall rules
+ssh root@178.128.42.148 "iptables -L -n | grep 443"
+```
+
+### If Nginx Proxy Issues
+```bash
+# Check Nginx configuration
+ssh root@64.227.46.188 "nginx -t"
+
+# Reload Nginx configuration
+ssh root@64.227.46.188 "docker exec viworks-nginx nginx -s reload"
+
+# Check Nginx logs
+ssh root@64.227.46.188 "docker logs viworks-nginx --tail 20"
+```
+
+## Success Criteria
+
+✅ **P0 Complete When:**
+- WebSocket server responds on port 8081
+- WebSocket upgrade returns HTTP 101
+- Nginx proxies to correct port
+
+✅ **P1 Complete When:**
+- Gateway agent service is running
+- Agent connects to backend successfully
+- Agent appears in backend agent registry
+
+✅ **P2 Complete When:**
+- End-to-end message flow works
+- Telemetry data flows from gateway to backend
+- Commands can be sent from backend to gateway

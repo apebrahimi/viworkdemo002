@@ -1,0 +1,10 @@
+--- a/nginx/nginx.conf
++++ b/nginx/nginx.conf
+@@ -180,7 +180,7 @@
+         # Service endpoints
+         location / {
+-            proxy_pass http://viworks-backend-agent-new:8080;
++            proxy_pass http://viworks-backend-agent-new:8081;
+             proxy_http_version 1.1;
+             proxy_set_header Upgrade $http_upgrade;
+             proxy_set_header Connection "upgrade";
