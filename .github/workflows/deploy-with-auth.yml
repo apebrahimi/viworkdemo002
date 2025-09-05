@@ -31,27 +31,15 @@ jobs:
         run: |
           ssh -o ConnectTimeout=10 -i ~/.ssh/id_ed25519 ${DROPLET_USER}@${DROPLET_IP} "echo 'SSH connection test successful'"
           
-      - name: Set up Rust for backend build
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          components: rustfmt, clippy
-          
-      - name: Cache cargo registry
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
-            
-      - name: Build authentication backend
-        working-directory: ./digital ocean docker/backend
+      - name: Verify main_demo.rs exists
         run: |
-          cargo build --release --bin viworks-backend
+          if [ ! -f "digital ocean docker/backend/src/main_demo.rs" ]; then
+            echo "❌ main_demo.rs not found!"
+            exit 1
+          else
+            echo "✅ main_demo.rs found"
+            ls -la "digital ocean docker/backend/src/main_demo.rs"
+          fi
           
       - name: Create comprehensive deployment script
         run: |
@@ -163,6 +151,17 @@ jobs:
           echo "🌐 Setting up two-network security architecture..."
           docker network create --driver bridge viworks-public 2>/dev/null || echo "Network viworks-public already exists"
           docker network create --driver bridge --internal viworks-internal 2>/dev/null || echo "Network viworks-internal already exists"
+          
+          # Verify main_demo.rs exists before building
+          echo "🔍 Verifying main_demo.rs exists..."
+          if [ ! -f "backend/src/main_demo.rs" ]; then
+            echo "❌ main_demo.rs not found in backend/src/"
+            echo "Available files:"
+            ls -la backend/src/
+            exit 1
+          else
+            echo "✅ main_demo.rs found"
+          fi
           
           # Build and start new containers with two-network setup
           echo "🔨 Building and starting new containers with two-network security..."
@@ -300,18 +299,13 @@ jobs:
             rm /tmp/github_ssh_key
           "
           
-      - name: Upload backend binary and deployment script
+      - name: Upload deployment script
         run: |
-          scp -i ~/.ssh/id_ed25519 "digital ocean docker/backend/target/release/viworks-backend" ${DROPLET_USER}@${DROPLET_IP}:/tmp/
           scp -i ~/.ssh/id_ed25519 deploy-with-auth.sh ${DROPLET_USER}@${DROPLET_IP}:/tmp/
           
       - name: Execute deployment with authentication
         run: |
           ssh -i ~/.ssh/id_ed25519 ${DROPLET_USER}@${DROPLET_IP} "
-            # Copy the new backend binary to the docker directory
-            cp /tmp/viworks-backend 'digital ocean docker/backend/target/release/'
-            chmod +x 'digital ocean docker/backend/target/release/viworks-backend'
-            
             # Execute the deployment script
             chmod +x /tmp/deploy-with-auth.sh && /tmp/deploy-with-auth.sh
           "

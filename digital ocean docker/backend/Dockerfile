@@ -57,7 +57,7 @@ RUN apk add --no-cache \
 WORKDIR /app
 
 # Copy binary, migrations & entrypoint
-COPY --from=builder /app/target/release/viworks-admin-backend /app/app
+COPY --from=builder /app/target/release/viworks-backend /app/app
 COPY --from=builder /app/migrations /app/migrations
 COPY ops/entrypoint.sh /app/entrypoint.sh
 
