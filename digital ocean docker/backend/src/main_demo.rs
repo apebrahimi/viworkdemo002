@@ -646,9 +646,9 @@ struct UserRow {
 async fn get_sessions(pool: web::Data<Option<PgPool>>) -> HttpResponse {
     info!("📋 Fetching sessions from database...");
     
-    match &*pool {
+    match pool.as_ref() {
         Some(pool) => {
-            match sqlx::query!(
+            match sqlx::query(
                 r#"
                 SELECT 
                     s.id, s.user_id, u.username, s.status, s.started_at, s.expires_at, 
@@ -666,19 +666,28 @@ async fn get_sessions(pool: web::Data<Option<PgPool>>) -> HttpResponse {
                     let session_responses: Vec<serde_json::Value> = sessions
                         .into_iter()
                         .map(|row| {
-                            let is_active = row.status == Some("active".to_string()) && 
-                                          row.expires_at > Utc::now();
-                            let is_revoked = row.status == Some("terminated".to_string());
+                            let id: Uuid = row.get("id");
+                            let username: String = row.get("username");
+                            let status: Option<String> = row.get("status");
+                            let started_at: Option<chrono::DateTime<chrono::Utc>> = row.get("started_at");
+                            let expires_at: chrono::DateTime<chrono::Utc> = row.get("expires_at");
+                            let last_activity_at: Option<chrono::DateTime<chrono::Utc>> = row.get("last_activity_at");
+                            let ip_address: Option<String> = row.get("ip_address");
+                            let user_agent: Option<String> = row.get("user_agent");
+                            
+                            let is_active = status == Some("active".to_string()) && 
+                                          expires_at > Utc::now();
+                            let is_revoked = status == Some("terminated".to_string());
                             
                             serde_json::json!({
-                                "session_id": row.id.to_string(),
-                                "username": row.username,
+                                "session_id": id.to_string(),
+                                "username": username,
                                 "access_token": "***hidden***",
-                                "created_at": row.started_at.map(|dt| dt.to_rfc3339()).unwrap_or_else(|| Utc::now().to_rfc3339()),
-                                "otp_expires": row.expires_at.to_rfc3339(),
-                                "last_activity": row.last_activity_at.map(|dt| dt.to_rfc3339()).unwrap_or_else(|| Utc::now().to_rfc3339()),
-                                "ip_address": row.ip_address.unwrap_or_else(|| "نامشخص".to_string()),
-                                "user_agent": row.user_agent.unwrap_or_else(|| "دسکتاپ".to_string()),
+                                "created_at": started_at.map(|dt| dt.to_rfc3339()).unwrap_or_else(|| Utc::now().to_rfc3339()),
+                                "otp_expires": expires_at.to_rfc3339(),
+                                "last_activity": last_activity_at.map(|dt| dt.to_rfc3339()).unwrap_or_else(|| Utc::now().to_rfc3339()),
+                                "ip_address": ip_address.unwrap_or_else(|| "نامشخص".to_string()),
+                                "user_agent": user_agent.unwrap_or_else(|| "دسکتاپ".to_string()),
                                 "status": if is_revoked { "terminated" } else if is_active { "active" } else { "expired" }
                             })
                         })

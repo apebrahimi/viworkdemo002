@@ -688,3 +688,6 @@ export const apiServices = {
   gateway: gatewayApi,
   audit: auditApi,
 };
+
+// Build timestamp for cache busting
+export const BUILD_TIMESTAMP = new Date().toISOString();
