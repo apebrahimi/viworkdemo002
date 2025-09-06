@@ -4,6 +4,7 @@ use sqlx::{PgPool, Row};
 use uuid::Uuid;
 use chrono::Utc;
 use bcrypt::{hash, DEFAULT_COST};
+use crate::models::UserStatus;
 
 #[derive(Debug, Deserialize)]
 pub struct CreateUserRequest {
@@ -27,7 +28,7 @@ pub struct User {
     pub id: String,
     pub username: String,
     pub email: String,
-    pub status: String,
+    pub status: UserStatus,
     pub last_login_at: Option<String>,
     pub failed_login_attempts: i32,
     pub locked_until: Option<String>,
@@ -40,7 +41,7 @@ pub async fn get_users(
 ) -> Result<HttpResponse, actix_web::Error> {
     let users = sqlx::query(
         r#"
-        SELECT id, username, email, status::text, last_login_at, 
+        SELECT id, username, email, status, last_login_at, 
                failed_login_attempts, locked_until, created_at, updated_at
         FROM users 
         ORDER BY created_at DESC
@@ -83,7 +84,7 @@ pub async fn get_user(
 
     let user = sqlx::query(
         r#"
-        SELECT id, username, email, status::text, last_login_at, 
+        SELECT id, username, email, status, last_login_at, 
                failed_login_attempts, locked_until, created_at, updated_at
         FROM users 
         WHERE id = $1
@@ -167,7 +168,7 @@ pub async fn create_user(
         r#"
         INSERT INTO users (id, username, email, password_hash, status, roles, created_at, updated_at)
         VALUES ($1, $2, $3, $4, $5::user_status, $6, NOW(), NOW())
-        RETURNING id, username, email, status::text, last_login_at, 
+        RETURNING id, username, email, status, last_login_at, 
                   failed_login_attempts, locked_until, created_at, updated_at
         "#
     )
