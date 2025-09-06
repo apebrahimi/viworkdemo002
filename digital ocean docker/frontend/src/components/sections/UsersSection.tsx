@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { 
   Users, 
   Shield, 
@@ -38,39 +38,10 @@ interface User {
 export function UsersSection() {
   const { language, isRTL } = useLanguage();
   
-  // Mock data - replace with actual API calls
-  const [users] = useState<User[]>([
-    {
-      id: '1',
-      username: 'admin',
-      email: 'admin@viworks.com',
-      role: 'admin',
-      status: 'active',
-      lastLogin: '2024-01-15T10:30:00Z',
-      createdAt: '2024-01-01T00:00:00Z',
-      deviceCount: 3
-    },
-    {
-      id: '2',
-      username: 'user1',
-      email: 'user1@example.com',
-      role: 'user',
-      status: 'active',
-      lastLogin: '2024-01-14T15:45:00Z',
-      createdAt: '2024-01-05T00:00:00Z',
-      deviceCount: 1
-    },
-    {
-      id: '3',
-      username: 'moderator1',
-      email: 'mod@example.com',
-      role: 'moderator',
-      status: 'pending',
-      lastLogin: '2024-01-13T09:20:00Z',
-      createdAt: '2024-01-10T00:00:00Z',
-      deviceCount: 2
-    }
-  ]);
+  // Real data from API
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // State
   const [searchTerm, setSearchTerm] = useState('');
@@ -81,6 +52,39 @@ export function UsersSection() {
     direction: 'asc'
   });
   const [showAddModal, setShowAddModal] = useState(false);
+
+  // Fetch users from API
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const response = await usersApi.getUsers();
+        
+        // Transform API response to match our User interface
+        const transformedUsers: User[] = response.users.map((user: any) => ({
+          id: user.id,
+          username: user.username,
+          email: user.email,
+          role: 'user', // Default role since API doesn't return role
+          status: user.status,
+          lastLogin: user.last_login_at || new Date().toISOString(),
+          createdAt: user.created_at,
+          deviceCount: 0 // Default device count
+        }));
+        
+        setUsers(transformedUsers);
+      } catch (err) {
+        console.error('Error fetching users:', err);
+        setError('Failed to load users');
+        toast.error('Failed to load users');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUsers();
+  }, []);
 
   // Computed values
   const roles = ['admin', 'user', 'moderator'];
@@ -168,11 +172,31 @@ export function UsersSection() {
 
   const handleAddUser = async (formData: { username: string; email: string; role: string }) => {
     try {
-      // TODO: Implement user creation API call
-      console.log('Adding user:', formData);
-      toast.success(language === 'fa' ? 'کاربر با موفقیت اضافه شد' : 'User added successfully');
+      const newUser = await usersApi.createUser({
+        username: formData.username,
+        email: formData.email,
+        password: 'TempPassword123!', // Generate a temporary password
+        role: formData.role,
+        is_active: true
+      });
+      
+      // Add the new user to the list
+      const transformedUser: User = {
+        id: newUser.id,
+        username: newUser.username,
+        email: newUser.email,
+        role: formData.role as 'admin' | 'user' | 'moderator',
+        status: newUser.status,
+        lastLogin: newUser.last_login_at || new Date().toISOString(),
+        createdAt: newUser.created_at,
+        deviceCount: 0
+      };
+      
+      setUsers(prev => [transformedUser, ...prev]);
       setShowAddModal(false);
+      toast.success(language === 'fa' ? 'کاربر با موفقیت اضافه شد' : 'User added successfully');
     } catch (error) {
+      console.error('Error creating user:', error);
       toast.error(language === 'fa' ? 'خطا در افزودن کاربر' : 'Failed to add user');
     }
   };
@@ -328,10 +352,20 @@ export function UsersSection() {
         }
       />
 
+      {/* Error Display */}
+      {error && (
+        <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-4">
+          <div className="flex items-center gap-2 text-red-700 dark:text-red-400">
+            <AlertCircle className="w-4 h-4" />
+            <span className="font-medium">{error}</span>
+          </div>
+        </div>
+      )}
+
       {/* Table */}
       <UsersTable
         users={filteredAndSortedUsers}
-        loading={false}
+        loading={loading}
         sortConfig={sortConfig}
         onSort={handleSort}
         onActivate={handleActivateUser}

@@ -764,7 +764,18 @@ async fn main() -> std::io::Result<()> {
         .with(tracing_subscriber::fmt::layer())
         .init();
     
-    info!("🚀 Starting ViWorkS Admin Panel Backend (Demo Mode)");
+    info!("🚀 Starting ViWorkS Admin Panel Backend (Production Mode)");
+    
+    // Debug mode - print effective configuration
+    let debug_startup = std::env::var("DEBUG_STARTUP").unwrap_or_else(|_| "0".to_string()) == "1";
+    if debug_startup {
+        info!("🔧 DEBUG_STARTUP: Effective configuration:");
+        info!("  HOST: {}", std::env::var("HOST").unwrap_or_else(|_| "0.0.0.0".to_string()));
+        info!("  PORT: {}", std::env::var("PORT").unwrap_or_else(|_| "8081".to_string()));
+        info!("  RUST_LOG: {}", std::env::var("RUST_LOG").unwrap_or_else(|_| "info".to_string()));
+        info!("  RUST_BACKTRACE: {}", std::env::var("RUST_BACKTRACE").unwrap_or_else(|_| "0".to_string()));
+    }
+    
     info!("🔧 Environment: HOST={}, PORT={}", 
         std::env::var("HOST").unwrap_or_else(|_| "0.0.0.0".to_string()),
         std::env::var("PORT").unwrap_or_else(|_| "8081".to_string())
@@ -899,6 +910,28 @@ async fn main() -> std::io::Result<()> {
     
     // Start the server and await it (this keeps the process running)
     info!("✅ ViWorkS Backend is now running on {}:{}", host, port);
+    info!("🔗 Health check available at: http://{}:{}/_healthz", host, port);
     
-    server.run().await
+    // Add graceful shutdown handling
+    let server_handle = server.run();
+    
+    // Set up signal handlers for graceful shutdown
+    let shutdown_signal = async {
+        tokio::signal::ctrl_c()
+            .await
+            .expect("Failed to install Ctrl+C handler");
+        info!("🛑 Received shutdown signal (SIGINT)");
+    };
+    
+    tokio::select! {
+        _ = server_handle => {
+            info!("🛑 Server stopped");
+        }
+        _ = shutdown_signal => {
+            info!("🛑 Graceful shutdown initiated");
+        }
+    }
+    
+    info!("👋 ViWorkS Backend shutdown complete");
+    Ok(())
 }
