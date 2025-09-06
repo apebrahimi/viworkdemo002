@@ -4,7 +4,7 @@ use sqlx::{PgPool, Row};
 use uuid::Uuid;
 use chrono::Utc;
 use bcrypt::{hash, DEFAULT_COST};
-use crate::models::UserStatus;
+use crate::models::{User, UserStatus};
 
 #[derive(Debug, Deserialize)]
 pub struct CreateUserRequest {
@@ -23,26 +23,15 @@ pub struct UpdateUserRequest {
     pub is_active: Option<bool>,
 }
 
-#[derive(Debug, Serialize)]
-pub struct User {
-    pub id: String,
-    pub username: String,
-    pub email: String,
-    pub status: UserStatus,
-    pub last_login_at: Option<String>,
-    pub failed_login_attempts: i32,
-    pub locked_until: Option<String>,
-    pub created_at: String,
-    pub updated_at: String,
-}
+// User struct is imported from crate::models
 
 pub async fn get_users(
     pool: web::Data<PgPool>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    let users = sqlx::query(
+    let users = sqlx::query_as::<_, User>(
         r#"
-        SELECT id, username, email, status, last_login_at, 
-               failed_login_attempts, locked_until, created_at, updated_at
+        SELECT id, username, email, password_hash, mobile, status, roles, 
+               created_at, updated_at, last_login_at, failed_login_attempts, locked_until
         FROM users 
         ORDER BY created_at DESC
         "#
@@ -54,24 +43,26 @@ pub async fn get_users(
         actix_web::error::ErrorInternalServerError("Database error")
     })?;
 
-    let users: Vec<User> = users
+    // Transform to frontend-compatible format
+    let response_users: Vec<serde_json::Value> = users
         .into_iter()
-        .map(|row| User {
-            id: row.get::<Uuid, _>("id").to_string(),
-            username: row.get("username"),
-            email: row.get("email"),
-            status: row.get("status"),
-            last_login_at: row.get::<Option<chrono::DateTime<Utc>>, _>("last_login_at")
-                .map(|dt| dt.to_rfc3339()),
-            failed_login_attempts: row.get("failed_login_attempts"),
-            locked_until: row.get::<Option<chrono::DateTime<Utc>>, _>("locked_until")
-                .map(|dt| dt.to_rfc3339()),
-            created_at: row.get::<chrono::DateTime<Utc>, _>("created_at").to_rfc3339(),
-            updated_at: row.get::<chrono::DateTime<Utc>, _>("updated_at").to_rfc3339(),
-        })
+        .map(|user| serde_json::json!({
+            "id": user.id.to_string(),
+            "username": user.username,
+            "email": user.email,
+            "status": user.status,
+            "last_login_at": user.last_login_at.map(|dt| dt.to_rfc3339()),
+            "failed_login_attempts": user.failed_login_attempts,
+            "locked_until": user.locked_until.map(|dt| dt.to_rfc3339()),
+            "created_at": user.created_at.to_rfc3339(),
+            "updated_at": user.updated_at.to_rfc3339()
+        }))
         .collect();
 
-    Ok(HttpResponse::Ok().json(users))
+    Ok(HttpResponse::Ok().json(serde_json::json!({
+        "success": true,
+        "users": response_users
+    })))
 }
 
 pub async fn get_user(
@@ -82,10 +73,10 @@ pub async fn get_user(
     let user_id_uuid = Uuid::parse_str(&user_id)
         .map_err(|_| actix_web::error::ErrorBadRequest("Invalid user ID"))?;
 
-    let user = sqlx::query(
+    let user = sqlx::query_as::<_, User>(
         r#"
-        SELECT id, username, email, status, last_login_at, 
-               failed_login_attempts, locked_until, created_at, updated_at
+        SELECT id, username, email, password_hash, mobile, status, roles, 
+               created_at, updated_at, last_login_at, failed_login_attempts, locked_until
         FROM users 
         WHERE id = $1
         "#
@@ -99,21 +90,19 @@ pub async fn get_user(
     })?;
 
     match user {
-        Some(row) => {
-            let user = User {
-                id: row.get::<Uuid, _>("id").to_string(),
-                username: row.get("username"),
-                email: row.get("email"),
-                status: row.get("status"),
-                last_login_at: row.get::<Option<chrono::DateTime<Utc>>, _>("last_login_at")
-                    .map(|dt| dt.to_rfc3339()),
-                failed_login_attempts: row.get("failed_login_attempts"),
-                locked_until: row.get::<Option<chrono::DateTime<Utc>>, _>("locked_until")
-                    .map(|dt| dt.to_rfc3339()),
-                created_at: row.get::<chrono::DateTime<Utc>, _>("created_at").to_rfc3339(),
-                updated_at: row.get::<chrono::DateTime<Utc>, _>("updated_at").to_rfc3339(),
-            };
-            Ok(HttpResponse::Ok().json(user))
+        Some(user) => {
+            let response_user = serde_json::json!({
+                "id": user.id.to_string(),
+                "username": user.username,
+                "email": user.email,
+                "status": user.status,
+                "last_login_at": user.last_login_at.map(|dt| dt.to_rfc3339()),
+                "failed_login_attempts": user.failed_login_attempts,
+                "locked_until": user.locked_until.map(|dt| dt.to_rfc3339()),
+                "created_at": user.created_at.to_rfc3339(),
+                "updated_at": user.updated_at.to_rfc3339()
+            });
+            Ok(HttpResponse::Ok().json(response_user))
         }
         None => Ok(HttpResponse::NotFound().json(serde_json::json!({
             "error": "User not found"
@@ -164,19 +153,19 @@ pub async fn create_user(
         })));
     }
 
-    let user = sqlx::query(
+    let user = sqlx::query_as::<_, User>(
         r#"
         INSERT INTO users (id, username, email, password_hash, status, roles, created_at, updated_at)
         VALUES ($1, $2, $3, $4, $5::user_status, $6, NOW(), NOW())
-        RETURNING id, username, email, status, last_login_at, 
-                  failed_login_attempts, locked_until, created_at, updated_at
+        RETURNING id, username, email, password_hash, mobile, status, roles, 
+                  created_at, updated_at, last_login_at, failed_login_attempts, locked_until
         "#
     )
     .bind(user_id)
     .bind(&user_data.username)
     .bind(&user_data.email)
     .bind(&password_hash)
-    .bind(if user_data.is_active { "active" } else { "pending" })
+    .bind(if user_data.is_active { UserStatus::Active } else { UserStatus::Pending })
     .bind(serde_json::json!([user_data.role]))
     .fetch_one(pool.get_ref())
     .await
@@ -185,21 +174,19 @@ pub async fn create_user(
         actix_web::error::ErrorInternalServerError("Database error")
     })?;
 
-    let created_user = User {
-        id: user.get::<Uuid, _>("id").to_string(),
-        username: user.get("username"),
-        email: user.get("email"),
-        status: user.get("status"),
-        last_login_at: user.get::<Option<chrono::DateTime<Utc>>, _>("last_login_at")
-            .map(|dt| dt.to_rfc3339()),
-        failed_login_attempts: user.get("failed_login_attempts"),
-        locked_until: user.get::<Option<chrono::DateTime<Utc>>, _>("locked_until")
-            .map(|dt| dt.to_rfc3339()),
-        created_at: user.get::<chrono::DateTime<Utc>, _>("created_at").to_rfc3339(),
-        updated_at: user.get::<chrono::DateTime<Utc>, _>("updated_at").to_rfc3339(),
-    };
+    let response_user = serde_json::json!({
+        "id": user.id.to_string(),
+        "username": user.username,
+        "email": user.email,
+        "status": user.status,
+        "last_login_at": user.last_login_at.map(|dt| dt.to_rfc3339()),
+        "failed_login_attempts": user.failed_login_attempts,
+        "locked_until": user.locked_until.map(|dt| dt.to_rfc3339()),
+        "created_at": user.created_at.to_rfc3339(),
+        "updated_at": user.updated_at.to_rfc3339()
+    });
 
-    Ok(HttpResponse::Created().json(created_user))
+    Ok(HttpResponse::Created().json(response_user))
 }
 
 pub async fn update_user(
