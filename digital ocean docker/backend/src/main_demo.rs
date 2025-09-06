@@ -802,6 +802,147 @@ async fn get_mobile_devices(pool: web::Data<Option<PgPool>>) -> HttpResponse {
     }
 }
 
+async fn get_db_status(pool: web::Data<Option<PgPool>>) -> HttpResponse {
+    info!("🔍 Checking database status...");
+    
+    match pool.as_ref() {
+        Some(pool) => {
+            // Test database connection
+            match sqlx::query("SELECT 1 as test")
+                .fetch_one(pool)
+                .await
+            {
+                Ok(_) => {
+                    // Check if users table exists and has data
+                    match sqlx::query("SELECT COUNT(*) as user_count FROM users")
+                        .fetch_one(pool)
+                        .await
+                    {
+                        Ok(row) => {
+                            let user_count: i64 = row.get("user_count");
+                            info!("✅ Database connected, found {} users", user_count);
+                            
+                            HttpResponse::Ok().json(serde_json::json!({
+                                "success": true,
+                                "database_connected": true,
+                                "user_count": user_count,
+                                "message": format!("Database connected successfully. Found {} users.", user_count)
+                            }))
+                        }
+                        Err(e) => {
+                            error!("❌ Failed to query users table: {}", e);
+                            HttpResponse::InternalServerError().json(serde_json::json!({
+                                "success": false,
+                                "database_connected": true,
+                                "error": format!("Failed to query users table: {}", e)
+                            }))
+                        }
+                    }
+                }
+                Err(e) => {
+                    error!("❌ Database connection failed: {}", e);
+                    HttpResponse::InternalServerError().json(serde_json::json!({
+                        "success": false,
+                        "database_connected": false,
+                        "error": format!("Database connection failed: {}", e)
+                    }))
+                }
+            }
+        }
+        None => {
+            error!("❌ Database pool is not available");
+            HttpResponse::InternalServerError().json(serde_json::json!({
+                "success": false,
+                "database_connected": false,
+                "error": "Database pool not available"
+            }))
+        }
+    }
+}
+
+async fn seed_test_users(pool: web::Data<Option<PgPool>>) -> HttpResponse {
+    info!("🌱 Seeding test users...");
+    
+    match pool.as_ref() {
+        Some(pool) => {
+            // Check if users already exist
+            match sqlx::query("SELECT COUNT(*) as user_count FROM users")
+                .fetch_one(pool)
+                .await
+            {
+                Ok(row) => {
+                    let user_count: i64 = row.get("user_count");
+                    if user_count > 0 {
+                        info!("⚠️ Users already exist ({} users), skipping seed", user_count);
+                        return HttpResponse::Ok().json(serde_json::json!({
+                            "success": true,
+                            "message": format!("Users already exist ({} users), skipping seed", user_count),
+                            "user_count": user_count
+                        }));
+                    }
+                }
+                Err(e) => {
+                    error!("❌ Failed to check user count: {}", e);
+                    return HttpResponse::InternalServerError().json(serde_json::json!({
+                        "success": false,
+                        "error": format!("Failed to check user count: {}", e)
+                    }));
+                }
+            }
+            
+            // Create test users
+            let test_users = vec![
+                ("admin", "admin@viworks.com", "admin123", "active", "[\"admin\"]"),
+                ("user1", "user1@viworks.com", "password123", "active", "[\"user\"]"),
+                ("user2", "user2@viworks.com", "password123", "pending", "[\"user\"]"),
+                ("moderator", "moderator@viworks.com", "password123", "active", "[\"moderator\"]"),
+            ];
+            
+            let mut created_count = 0;
+            for (username, email, password, status, roles) in test_users {
+                let password_hash = hash(password, DEFAULT_COST).unwrap();
+                let user_id = Uuid::new_v4();
+                
+                match sqlx::query(
+                    "INSERT INTO users (id, username, email, password_hash, status, roles, created_at, updated_at) 
+                     VALUES ($1, $2, $3, $4, $5::user_status, $6::jsonb, NOW(), NOW())"
+                )
+                .bind(user_id)
+                .bind(username)
+                .bind(email)
+                .bind(password_hash)
+                .bind(status)
+                .bind(roles)
+                .execute(pool)
+                .await
+                {
+                    Ok(_) => {
+                        info!("✅ Created user: {}", username);
+                        created_count += 1;
+                    }
+                    Err(e) => {
+                        error!("❌ Failed to create user {}: {}", username, e);
+                    }
+                }
+            }
+            
+            info!("🌱 Seeded {} test users", created_count);
+            HttpResponse::Ok().json(serde_json::json!({
+                "success": true,
+                "message": format!("Successfully seeded {} test users", created_count),
+                "created_count": created_count
+            }))
+        }
+        None => {
+            error!("❌ Database pool is not available");
+            HttpResponse::InternalServerError().json(serde_json::json!({
+                "success": false,
+                "error": "Database pool not available"
+            }))
+        }
+    }
+}
+
 async fn get_device_requests(_pool: web::Data<Option<PgPool>>) -> HttpResponse {
     info!("📋 Fetching device requests from database...");
     
@@ -991,6 +1132,8 @@ async fn main() -> std::io::Result<()> {
             .route("/api/v1/admin/sessions", web::get().to(get_sessions))
             .route("/api/v1/admin/mobile-devices", web::get().to(get_mobile_devices))
             .route("/api/v1/admin/device-requests", web::get().to(get_device_requests))
+            .route("/api/v1/debug/db-status", web::get().to(get_db_status))
+            .route("/api/v1/debug/seed-users", web::post().to(seed_test_users))
             .route("/api/v1/admin/device/requests", web::get().to(get_device_requests))
             .route("/api/v1/admin/audit-logs", web::get().to(get_audit_logs))
             .route("/api/v1/sessions", web::get().to(|| async { 
