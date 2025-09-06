@@ -26,6 +26,38 @@ pub struct RequestTwoFactorCode {
     pub username: String,
 }
 
+// Enhanced Desktop + Mobile Auth Flow
+#[derive(Debug, Deserialize)]
+pub struct MobileOtpRequest {
+    pub username: String,
+    pub password: String,
+    pub device_id: String,
+    pub mobile_device_id: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ValidateOtpRequest {
+    pub username: String,
+    pub code: String,
+    pub challenge_id: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SystemCheckRequest {
+    pub username: String,
+    pub password: String,
+    pub device_id: String,
+    pub system_checks: SystemCheckResult,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SystemCheckResult {
+    pub no_active_tunnel: bool,
+    pub clock_skew_ok: bool,
+    pub network_ok: bool,
+    pub checks_passed: bool,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct ValidateCodeRequest {
     pub username: String,
@@ -130,6 +162,33 @@ pub struct TwoFactorCodeResponse {
     pub success: bool,
     pub message: String,
     pub code: Option<String>,
+}
+
+// Enhanced Desktop + Mobile Auth Flow Responses
+#[derive(Debug, Serialize)]
+pub struct OtpChallengeResponse {
+    pub success: bool,
+    pub challenge_id: String,
+    pub expires_at: i64,
+    pub message: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct LoginWithChecksResponse {
+    pub success: bool,
+    pub message: String,
+    pub requires_2fa: bool,
+    pub challenge_id: Option<String>,
+    pub session_token: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ConnectionConfigsResponse {
+    pub success: bool,
+    pub message: String,
+    pub stunnel_config: String,
+    pub portknock_config: String,
+    pub openvpn_config: String,
 }
 
 // Device Management Responses
@@ -1081,6 +1140,361 @@ pub async fn client_bootstrap(
     Ok(HttpResponse::Ok().json(response))
 }
 
+// Enhanced Desktop + Mobile Authentication Flow Endpoints
+
+/// Login with system checks - validates credentials and system integrity
+pub async fn login_with_system_checks(
+    pool: web::Data<PgPool>,
+    request_data: web::Json<SystemCheckRequest>,
+) -> Result<HttpResponse, actix_web::Error> {
+    let username = request_data.username.clone();
+    let password = request_data.password.clone();
+    let device_id = request_data.device_id.clone();
+    let system_checks = &request_data.system_checks;
+
+    // Validate system checks first
+    if !system_checks.checks_passed {
+        return Ok(HttpResponse::BadRequest().json(serde_json::json!({
+            "success": false,
+            "message": "System checks failed. Please ensure no active tunnel, correct system time, and network connectivity."
+        })));
+    }
+
+    // Check if user exists and password is correct
+    let user = sqlx::query(
+        r#"
+        SELECT id, username, email, password_hash, role::text, is_active, last_login_at, 
+               failed_login_attempts, locked_until, created_at, updated_at
+        FROM users 
+        WHERE username = $1 AND is_active = true
+        "#
+    )
+    .bind(&username)
+    .fetch_optional(pool.get_ref())
+    .await
+    .map_err(|e| {
+        eprintln!("Database error: {}", e);
+        actix_web::error::ErrorInternalServerError("Database error")
+    })?;
+
+    match user {
+        Some(row) => {
+            let user_id: Uuid = row.get("id");
+            let password_hash: String = row.get("password_hash");
+            let role: String = row.get("role");
+            let locked_until: Option<chrono::DateTime<Utc>> = row.get("locked_until");
+
+            // Verify password
+            let password_valid = verify(&password, &password_hash)
+                .map_err(|_| actix_web::error::ErrorInternalServerError("Password verification failed"))?;
+
+            if !password_valid {
+                return Ok(HttpResponse::Unauthorized().json(serde_json::json!({
+                    "success": false,
+                    "message": "Invalid username or password"
+                })));
+            }
+
+            // Check if account is locked
+            if let Some(locked_until) = locked_until {
+                if locked_until > Utc::now() {
+                    return Ok(HttpResponse::Unauthorized().json(serde_json::json!({
+                        "success": false,
+                        "message": "Account is locked. Please try again later."
+                    })));
+                }
+            }
+
+            // Check if user has registered mobile device
+            let mobile_device = sqlx::query(
+                r#"
+                SELECT id FROM user_devices 
+                WHERE user_id = $1 AND is_active = true
+                LIMIT 1
+                "#
+            )
+            .bind(user_id)
+            .fetch_optional(pool.get_ref())
+            .await
+            .map_err(|e| {
+                eprintln!("Database error: {}", e);
+                actix_web::error::ErrorInternalServerError("Database error")
+            })?;
+
+            if mobile_device.is_none() {
+                return Ok(HttpResponse::Ok().json(LoginWithChecksResponse {
+                    success: true,
+                    message: "Please register a mobile device first".to_string(),
+                    requires_2fa: false,
+                    challenge_id: None,
+                    session_token: None,
+                }));
+            }
+
+            // Generate challenge ID for OTP
+            let challenge_id = Uuid::new_v4().to_string();
+            
+            // Generate 6-digit OTP code
+            let mut rng = rand::thread_rng();
+            let otp_code: String = (0..6)
+                .map(|_| rng.gen_range(0..10).to_string())
+                .collect();
+            
+            // Store OTP with 5-minute expiration
+            let expires_at = Utc::now() + Duration::minutes(5);
+            {
+                let mut codes = TWO_FACTOR_CODES.lock().unwrap();
+                codes.insert(challenge_id.clone(), (otp_code.clone(), expires_at));
+            }
+
+            // TODO: Send push notification to mobile device
+            // For demo, we'll return the code in the response
+            println!("DEMO OTP CODE for {}: {}", username, otp_code);
+
+            Ok(HttpResponse::Ok().json(LoginWithChecksResponse {
+                success: true,
+                message: "2FA required. Check your mobile device for the OTP code.".to_string(),
+                requires_2fa: true,
+                challenge_id: Some(challenge_id),
+                session_token: None,
+            }))
+        }
+        None => {
+            Ok(HttpResponse::Unauthorized().json(serde_json::json!({
+                "success": false,
+                "message": "Invalid username or password"
+            })))
+        }
+    }
+}
+
+/// Request mobile OTP challenge
+pub async fn request_mobile_otp(
+    pool: web::Data<PgPool>,
+    request_data: web::Json<MobileOtpRequest>,
+) -> Result<HttpResponse, actix_web::Error> {
+    let username = request_data.username.clone();
+    let password = request_data.password.clone();
+    let device_id = request_data.device_id.clone();
+
+    // Validate credentials first
+    let user = sqlx::query(
+        r#"
+        SELECT id, username, email, password_hash, role::text, is_active
+        FROM users 
+        WHERE username = $1 AND is_active = true
+        "#
+    )
+    .bind(&username)
+    .fetch_optional(pool.get_ref())
+    .await
+    .map_err(|e| {
+        eprintln!("Database error: {}", e);
+        actix_web::error::ErrorInternalServerError("Database error")
+    })?;
+
+    match user {
+        Some(row) => {
+            let user_id: Uuid = row.get("id");
+            let password_hash: String = row.get("password_hash");
+
+            // Verify password
+            let password_valid = verify(&password, &password_hash)
+                .map_err(|_| actix_web::error::ErrorInternalServerError("Password verification failed"))?;
+
+            if !password_valid {
+                return Ok(HttpResponse::Unauthorized().json(serde_json::json!({
+                    "success": false,
+                    "message": "Invalid credentials"
+                })));
+            }
+
+            // Check if user has registered mobile device
+            let mobile_device = sqlx::query(
+                r#"
+                SELECT id, fcm_token FROM user_devices 
+                WHERE user_id = $1 AND is_active = true
+                LIMIT 1
+                "#
+            )
+            .bind(user_id)
+            .fetch_optional(pool.get_ref())
+            .await
+            .map_err(|e| {
+                eprintln!("Database error: {}", e);
+                actix_web::error::ErrorInternalServerError("Database error")
+            })?;
+
+            if mobile_device.is_none() {
+                return Ok(HttpResponse::BadRequest().json(serde_json::json!({
+                    "success": false,
+                    "message": "No registered mobile device found"
+                })));
+            }
+
+            // Generate challenge ID and OTP
+            let challenge_id = Uuid::new_v4().to_string();
+            let mut rng = rand::thread_rng();
+            let otp_code: String = (0..6)
+                .map(|_| rng.gen_range(0..10).to_string())
+                .collect();
+            
+            let expires_at = Utc::now() + Duration::minutes(5);
+            {
+                let mut codes = TWO_FACTOR_CODES.lock().unwrap();
+                codes.insert(challenge_id.clone(), (otp_code.clone(), expires_at));
+            }
+
+            // TODO: Send push notification to mobile device
+            // For demo, we'll log the code
+            println!("DEMO OTP CODE for {}: {}", username, otp_code);
+
+            Ok(HttpResponse::Ok().json(OtpChallengeResponse {
+                success: true,
+                challenge_id,
+                expires_at: expires_at.timestamp(),
+                message: "OTP challenge created successfully".to_string(),
+            }))
+        }
+        None => {
+            Ok(HttpResponse::Unauthorized().json(serde_json::json!({
+                "success": false,
+                "message": "Invalid credentials"
+            })))
+        }
+    }
+}
+
+/// Validate mobile OTP and return connection configs
+pub async fn validate_mobile_otp(
+    pool: web::Data<PgPool>,
+    request_data: web::Json<ValidateOtpRequest>,
+) -> Result<HttpResponse, actix_web::Error> {
+    let username = request_data.username.clone();
+    let code = request_data.code.clone();
+    let challenge_id = request_data.challenge_id.clone();
+
+    // Validate OTP code
+    let code_valid = {
+        let codes = TWO_FACTOR_CODES.lock().unwrap();
+        if let Some((stored_code, expires_at)) = codes.get(&challenge_id) {
+            stored_code == &code && expires_at > &Utc::now()
+        } else {
+            false
+        }
+    };
+
+    if !code_valid {
+        return Ok(HttpResponse::Unauthorized().json(serde_json::json!({
+            "success": false,
+            "message": "Invalid or expired OTP code"
+        })));
+    }
+
+    // Remove used code
+    {
+        let mut codes = TWO_FACTOR_CODES.lock().unwrap();
+        codes.remove(&challenge_id);
+    }
+
+    // Get user info
+    let user = sqlx::query(
+        r#"
+        SELECT id, username, role::text FROM users 
+        WHERE username = $1 AND is_active = true
+        "#
+    )
+    .bind(&username)
+    .fetch_optional(pool.get_ref())
+    .await
+    .map_err(|e| {
+        eprintln!("Database error: {}", e);
+        actix_web::error::ErrorInternalServerError("Database error")
+    })?;
+
+    match user {
+        Some(row) => {
+            let user_id: Uuid = row.get("id");
+            let role: String = row.get("role");
+
+            // Generate session token
+            let session_token = create_token(&user_id.to_string(), &role)
+                .map_err(|_| actix_web::error::ErrorInternalServerError("Token generation failed"))?;
+
+            // Store session in database
+            let expires_at = Utc::now() + Duration::hours(24);
+            sqlx::query(
+                r#"
+                INSERT INTO user_sessions (user_id, token_hash, expires_at, ip_address, user_agent)
+                VALUES ($1, $2, $3, $4, $5)
+                "#
+            )
+            .bind(user_id)
+            .bind(&session_token)
+            .bind(expires_at)
+            .bind(None::<IpNetwork>)
+            .bind(None::<String>)
+            .execute(pool.get_ref())
+            .await
+            .map_err(|e| {
+                eprintln!("Failed to store session: {}", e);
+                actix_web::error::ErrorInternalServerError("Database error")
+            })?;
+
+            // Generate connection configs
+            let configs = ConnectionConfigsResponse {
+                success: true,
+                message: "Authentication successful. Connection configs generated.".to_string(),
+                stunnel_config: format!(
+                    "client = yes\n\
+                    [vpn]\n\
+                    accept = 127.0.0.1:9443\n\
+                    connect = gw.viworks.com:8443\n\
+                    cert = /etc/ssl/certs/client.crt\n\
+                    key = /etc/ssl/private/client.key\n\
+                    CAfile = /etc/ssl/certs/ca.crt\n\
+                    verify = 2"
+                ),
+                portknock_config: format!(
+                    "SERVER_IP=185.231.180.118\n\
+                    KEY_RIJNDAEL=demo_rijndael_key_32_chars_long\n\
+                    KEY_HMAC=demo_hmac_key_32_chars_long\n\
+                    PORTS=62201,62202,62203"
+                ),
+                openvpn_config: format!(
+                    "client\n\
+                    dev tun\n\
+                    proto tcp\n\
+                    remote 127.0.0.1 9443\n\
+                    resolv-retry infinite\n\
+                    nobind\n\
+                    persist-key\n\
+                    persist-tun\n\
+                    remote-cert-tls server\n\
+                    cipher AES-256-GCM\n\
+                    auth SHA256\n\
+                    key-direction 1\n\
+                    verb 3\n\
+                    auth-user-pass /etc/openvpn/auth.txt"
+                ),
+            };
+
+            Ok(HttpResponse::Ok().json(serde_json::json!({
+                "success": true,
+                "message": "Authentication successful",
+                "session_token": session_token,
+                "configs": configs
+            })))
+        }
+        None => {
+            Ok(HttpResponse::NotFound().json(serde_json::json!({
+                "success": false,
+                "message": "User not found"
+            })))
+        }
+    }
+}
+
 pub fn configure_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/auth")
@@ -1098,5 +1512,9 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
             .route("/challenge-verify", web::post().to(challenge_verify))
             .route("/device-bind", web::post().to(device_bind_request))
             .route("/client-bootstrap", web::post().to(client_bootstrap))
+            // Enhanced Desktop + Mobile Auth Flow
+            .route("/login-with-checks", web::post().to(login_with_system_checks))
+            .route("/request-mobile-otp", web::post().to(request_mobile_otp))
+            .route("/validate-mobile-otp", web::post().to(validate_mobile_otp))
     );
 }
