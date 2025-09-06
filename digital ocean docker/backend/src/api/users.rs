@@ -27,8 +27,7 @@ pub struct User {
     pub id: String,
     pub username: String,
     pub email: String,
-    pub role: String,
-    pub is_active: bool,
+    pub status: String,
     pub last_login_at: Option<String>,
     pub failed_login_attempts: i32,
     pub locked_until: Option<String>,
@@ -41,7 +40,7 @@ pub async fn get_users(
 ) -> Result<HttpResponse, actix_web::Error> {
     let users = sqlx::query(
         r#"
-        SELECT id, username, email, role::text, is_active, last_login_at, 
+        SELECT id, username, email, status::text, last_login_at, 
                failed_login_attempts, locked_until, created_at, updated_at
         FROM users 
         ORDER BY created_at DESC
@@ -60,8 +59,7 @@ pub async fn get_users(
             id: row.get::<Uuid, _>("id").to_string(),
             username: row.get("username"),
             email: row.get("email"),
-            role: row.get("role"),
-            is_active: row.get("is_active"),
+            status: row.get("status"),
             last_login_at: row.get::<Option<chrono::DateTime<Utc>>, _>("last_login_at")
                 .map(|dt| dt.to_rfc3339()),
             failed_login_attempts: row.get("failed_login_attempts"),
@@ -85,7 +83,7 @@ pub async fn get_user(
 
     let user = sqlx::query(
         r#"
-        SELECT id, username, email, role::text, is_active, last_login_at, 
+        SELECT id, username, email, status::text, last_login_at, 
                failed_login_attempts, locked_until, created_at, updated_at
         FROM users 
         WHERE id = $1
@@ -105,8 +103,7 @@ pub async fn get_user(
                 id: row.get::<Uuid, _>("id").to_string(),
                 username: row.get("username"),
                 email: row.get("email"),
-                role: row.get("role"),
-                is_active: row.get("is_active"),
+                status: row.get("status"),
                 last_login_at: row.get::<Option<chrono::DateTime<Utc>>, _>("last_login_at")
                     .map(|dt| dt.to_rfc3339()),
                 failed_login_attempts: row.get("failed_login_attempts"),
@@ -168,9 +165,9 @@ pub async fn create_user(
 
     let user = sqlx::query(
         r#"
-        INSERT INTO users (id, username, email, password_hash, role, is_active, created_at, updated_at)
-        VALUES ($1, $2, $3, $4, $5::user_role, $6, NOW(), NOW())
-        RETURNING id, username, email, role::text, is_active, last_login_at, 
+        INSERT INTO users (id, username, email, password_hash, status, roles, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5::user_status, $6, NOW(), NOW())
+        RETURNING id, username, email, status::text, last_login_at, 
                   failed_login_attempts, locked_until, created_at, updated_at
         "#
     )
@@ -178,8 +175,8 @@ pub async fn create_user(
     .bind(&user_data.username)
     .bind(&user_data.email)
     .bind(&password_hash)
-    .bind(&user_data.role)
-    .bind(user_data.is_active)
+    .bind(if user_data.is_active { "active" } else { "pending" })
+    .bind(serde_json::json!([user_data.role]))
     .fetch_one(pool.get_ref())
     .await
     .map_err(|e| {
@@ -191,8 +188,7 @@ pub async fn create_user(
         id: user.get::<Uuid, _>("id").to_string(),
         username: user.get("username"),
         email: user.get("email"),
-        role: user.get("role"),
-        is_active: user.get("is_active"),
+        status: user.get("status"),
         last_login_at: user.get::<Option<chrono::DateTime<Utc>>, _>("last_login_at")
             .map(|dt| dt.to_rfc3339()),
         failed_login_attempts: user.get("failed_login_attempts"),
