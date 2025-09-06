@@ -113,7 +113,7 @@ export const usersApi = {
         email: user.email,
         mobile: '09123456789', // Default mobile
         role: 'user', // Default role
-        status: user.status,
+        status: user.status?.toLowerCase() || 'active', // Normalize status to lowercase
         device_bound: true, // Default to true
         created_at: user.created_at,
         last_login: user.last_login_at || new Date().toISOString(),
@@ -149,7 +149,7 @@ export const usersApi = {
       username: user.username,
       email: user.email,
       role: 'user',
-      status: user.status,
+      status: user.status?.toLowerCase() || 'active', // Normalize status to lowercase
       created_at: user.created_at,
       last_login: new Date().toISOString(),
     };

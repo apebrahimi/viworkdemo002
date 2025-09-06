@@ -67,7 +67,7 @@ export function UsersSection() {
           username: user.username,
           email: user.email,
           role: 'user', // Default role since API doesn't return role
-          status: user.status,
+          status: user.status?.toLowerCase() || 'active', // Normalize status to lowercase
           lastLogin: user.last_login_at || new Date().toISOString(),
           createdAt: user.created_at,
           deviceCount: 0 // Default device count
