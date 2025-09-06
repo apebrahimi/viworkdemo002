@@ -15,6 +15,9 @@ use sqlx::{PgPool, Row};
 use bcrypt::{hash, verify, DEFAULT_COST};
 use uuid::Uuid;
 
+// Import models for proper database type handling
+mod models;
+
 // Demo data structures
 #[derive(Debug, Serialize, Deserialize)]
 struct LoginRequest {
@@ -584,34 +587,42 @@ async fn get_users(pool: web::Data<Option<PgPool>>) -> HttpResponse {
     if let Some(pool) = pool.as_ref() {
         info!("✅ Database pool is available");
         
-        // Use a more robust query with proper error handling
-        let query_result = sqlx::query_as::<_, UserRow>(
-            "SELECT id, username, email, status, created_at, last_login_at FROM users ORDER BY created_at DESC"
+        // Use the proper User struct from models.rs that handles the user_status enum
+        let query_result = sqlx::query_as::<_, crate::models::User>(
+            r#"
+            SELECT id, username, email, password_hash, mobile, status, roles, 
+                   created_at, updated_at, last_login_at, failed_login_attempts, locked_until
+            FROM users 
+            ORDER BY created_at DESC
+            "#
         )
         .fetch_all(pool)
         .await;
         
         match query_result {
-            Ok(rows) => {
-                info!("✅ Found {} users in database", rows.len());
-                let mut users = Vec::new();
+            Ok(users) => {
+                info!("✅ Found {} users in database", users.len());
                 
-                for row in rows {
-                    let user_json = serde_json::json!({
-                        "id": row.id.to_string(),
-                        "username": row.username,
-                        "email": row.email,
-                        "status": row.status,
-                        "created_at": row.created_at.to_rfc3339(),
-                        "last_login_at": row.last_login_at.map(|dt| dt.to_rfc3339())
-                    });
-                    users.push(user_json);
-                }
+                // Transform to frontend-compatible format
+                let response_users: Vec<serde_json::Value> = users
+                    .into_iter()
+                    .map(|user| serde_json::json!({
+                        "id": user.id.to_string(),
+                        "username": user.username,
+                        "email": user.email,
+                        "status": user.status,
+                        "last_login_at": user.last_login_at.map(|dt| dt.to_rfc3339()),
+                        "failed_login_attempts": user.failed_login_attempts,
+                        "locked_until": user.locked_until.map(|dt| dt.to_rfc3339()),
+                        "created_at": user.created_at.to_rfc3339(),
+                        "updated_at": user.updated_at.to_rfc3339()
+                    }))
+                    .collect();
                 
-                info!("✅ Returning {} users to frontend", users.len());
+                info!("✅ Returning {} users to frontend", response_users.len());
                 HttpResponse::Ok().json(serde_json::json!({
                     "success": true,
-                    "users": users
+                    "users": response_users
                 }))
             }
             Err(e) => {
@@ -712,6 +723,80 @@ async fn get_sessions(pool: web::Data<Option<PgPool>>) -> HttpResponse {
             HttpResponse::InternalServerError().json(serde_json::json!({
                 "success": false,
                 "error": "Database not available"
+            }))
+        }
+    }
+}
+
+async fn get_mobile_devices(pool: web::Data<Option<PgPool>>) -> HttpResponse {
+    info!("📱 Fetching mobile devices from database...");
+    
+    match pool.as_ref() {
+        Some(pool) => {
+            match sqlx::query_as::<_, crate::models::MobileDevice>(
+                r#"
+                SELECT id, user_id, device_id, fcm_token, device_model, device_os, 
+                       app_version, bound_at, last_used_at, status
+                FROM mobile_devices 
+                ORDER BY bound_at DESC
+                "#
+            )
+            .fetch_all(pool)
+            .await
+            {
+                Ok(devices) => {
+                    info!("✅ Found {} mobile devices in database", devices.len());
+                    
+                    // Transform to frontend-compatible format
+                    let response_devices: Vec<serde_json::Value> = devices
+                        .into_iter()
+                        .map(|device| {
+                            // Get username for the device
+                            let username = "کاربر موبایل"; // Default, could be enhanced to join with users table
+                            
+                            serde_json::json!({
+                                "id": device.id.to_string(),
+                                "userName": username,
+                                "deviceName": device.device_model.as_ref().unwrap_or(&"نامشخص".to_string()).clone(),
+                                "deviceModel": device.device_model.as_ref().unwrap_or(&"نامشخص".to_string()).clone(),
+                                "platform": if device.device_os.as_ref().map_or(false, |os| os.to_lowercase().contains("ios")) { "ios" } else { "android" },
+                                "status": match device.status {
+                                    crate::models::DeviceStatus::Approved => "active",
+                                    crate::models::DeviceStatus::Pending => "pending",
+                                    crate::models::DeviceStatus::Rejected => "inactive",
+                                    crate::models::DeviceStatus::Revoked => "inactive",
+                                },
+                                "lastActiveCity": "تهران", // Default city
+                                "lastActivity": device.last_used_at.to_rfc3339(),
+                                "bindingDate": device.bound_at.to_rfc3339(),
+                                "osVersion": device.device_os.as_ref().unwrap_or(&"نامشخص".to_string()).clone(),
+                                "appVersion": device.app_version.as_ref().unwrap_or(&"1.0.0".to_string()).clone(),
+                                "deviceId": device.device_id,
+                                "fcmToken": device.fcm_token.as_ref().unwrap_or(&"نامشخص".to_string()).clone()
+                            })
+                        })
+                        .collect();
+                    
+                    info!("✅ Returning {} mobile devices to frontend", response_devices.len());
+                    HttpResponse::Ok().json(serde_json::json!({
+                        "success": true,
+                        "devices": response_devices
+                    }))
+                }
+                Err(e) => {
+                    error!("❌ Database query failed: {}", e);
+                    HttpResponse::InternalServerError().json(serde_json::json!({
+                        "success": false,
+                        "message": format!("Database query failed: {}", e)
+                    }))
+                }
+            }
+        }
+        None => {
+            error!("❌ Database pool is not available");
+            HttpResponse::InternalServerError().json(serde_json::json!({
+                "success": false,
+                "message": "Database not available"
             }))
         }
     }
@@ -904,6 +989,7 @@ async fn main() -> std::io::Result<()> {
             .route("/api/v1/users", web::get().to(get_users))
             .route("/api/v1/admin/users", web::get().to(get_users))
             .route("/api/v1/admin/sessions", web::get().to(get_sessions))
+            .route("/api/v1/admin/mobile-devices", web::get().to(get_mobile_devices))
             .route("/api/v1/admin/device-requests", web::get().to(get_device_requests))
             .route("/api/v1/admin/device/requests", web::get().to(get_device_requests))
             .route("/api/v1/admin/audit-logs", web::get().to(get_audit_logs))

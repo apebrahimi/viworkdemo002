@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { 
   Smartphone, 
   Plus, 
@@ -20,6 +20,7 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { SearchBar } from '@/components/ui/SearchBar';
 import { MobileAppsTable } from '@/components/ui/DataTableNew';
 import { formatDate, type SortField, type SortDirection, type SortConfig } from '@/lib/utils';
+import { mobileDevicesApi } from '@/lib/api-services';
 
 interface MobileApp {
   id: string;
@@ -33,66 +34,42 @@ interface MobileApp {
   bindingDate: string;
   osVersion: string;
   appVersion: string;
+  deviceId?: string;
+  fcmToken?: string;
 }
 
 export function MobileApplicationsSection() {
   const { language, isRTL } = useLanguage();
   
-  // Mock data - replace with actual API calls
-  const [apps] = useState<MobileApp[]>([
-    {
-      id: '1',
-      userName: 'احمد محمدی',
-      deviceName: 'Samsung Galaxy S23',
-      deviceModel: 'SM-S918B',
-      platform: 'android',
-      status: 'active',
-      lastActiveCity: 'تهران',
-      lastActivity: '2024-01-15T10:30:00Z',
-      bindingDate: '2024-01-01T00:00:00Z',
-      osVersion: 'Android 14',
-      appVersion: '1.2.3'
-    },
-    {
-      id: '2',
-      userName: 'فاطمه احمدی',
-      deviceName: 'iPhone 15 Pro',
-      deviceModel: 'iPhone16,1',
-      platform: 'ios',
-      status: 'active',
-      lastActiveCity: 'اصفهان',
-      lastActivity: '2024-01-14T15:45:00Z',
-      bindingDate: '2024-01-05T00:00:00Z',
-      osVersion: 'iOS 17.2',
-      appVersion: '1.1.8'
-    },
-    {
-      id: '3',
-      userName: 'علی رضایی',
-      deviceName: 'Google Pixel 7',
-      deviceModel: 'Pixel 7',
-      platform: 'android',
-      status: 'maintenance',
-      lastActiveCity: 'مشهد',
-      lastActivity: '2024-01-13T09:20:00Z',
-      bindingDate: '2024-01-10T00:00:00Z',
-      osVersion: 'Android 14',
-      appVersion: '2.0.1'
-    },
-    {
-      id: '4',
-      userName: 'مریم کریمی',
-      deviceName: 'OnePlus 11',
-      deviceModel: 'CPH2447',
-      platform: 'android',
-      status: 'pending',
-      lastActiveCity: 'شیراز',
-      lastActivity: '2024-01-12T14:30:00Z',
-      bindingDate: '2024-01-08T00:00:00Z',
-      osVersion: 'Android 13',
-      appVersion: '0.9.5'
+  // State for mobile devices
+  const [apps, setApps] = useState<MobileApp[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch mobile devices from API
+  const fetchMobileDevices = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const response = await mobileDevicesApi.getMobileDevices();
+      
+      if (response.devices) {
+        setApps(response.devices);
+      } else {
+        setError('Failed to fetch mobile devices');
+      }
+    } catch (err) {
+      setError('Error fetching mobile devices');
+      console.error('Error fetching mobile devices:', err);
+    } finally {
+      setLoading(false);
     }
-  ]);
+  };
+
+  useEffect(() => {
+    fetchMobileDevices();
+  }, []);
 
   // State
   const [searchTerm, setSearchTerm] = useState('');
@@ -197,6 +174,52 @@ export function MobileApplicationsSection() {
     // TODO: Implement API call
     toast.success(language === 'fa' ? 'جزئیات اپلیکیشن' : 'App details');
   };
+
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="flex flex-col h-screen" style={{ height: 'calc(100vh - 100px)', overflow: 'hidden' }}>
+        <PageHeader
+          title={t('mobileApplications', language)}
+          description={t('mobileApplicationsDesc', language)}
+        />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">
+              {language === 'fa' ? 'در حال بارگذاری دستگاه‌های موبایل...' : 'Loading mobile devices...'}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="flex flex-col h-screen" style={{ height: 'calc(100vh - 100px)', overflow: 'hidden' }}>
+        <PageHeader
+          title={t('mobileApplications', language)}
+          description={t('mobileApplicationsDesc', language)}
+        />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <div className="text-red-500 mb-4">
+              <XCircle className="w-12 h-12 mx-auto" />
+            </div>
+            <p className="text-muted-foreground mb-4">{error}</p>
+            <button
+              onClick={fetchMobileDevices}
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+            >
+              {language === 'fa' ? 'تلاش مجدد' : 'Retry'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-screen" style={{ height: 'calc(100vh - 100px)', overflow: 'hidden' }}>
@@ -322,7 +345,7 @@ export function MobileApplicationsSection() {
       {/* Table */}
       <MobileAppsTable
         apps={filteredAndSortedApps}
-        loading={false}
+        loading={loading}
         sortConfig={sortConfig}
         onSort={handleSort}
         onActivate={handleActivate}
