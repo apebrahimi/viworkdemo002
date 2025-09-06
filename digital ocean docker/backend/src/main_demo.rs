@@ -581,24 +581,65 @@ async fn validate_2fa_code(req: web::Json<TwoFactorValidation>) -> HttpResponse 
 async fn get_users(pool: web::Data<Option<PgPool>>) -> HttpResponse {
     info!("📋 Fetching users from database...");
     
-    // For now, return mock data to prevent crashes while we debug
-    info!("🔧 Returning mock users data for debugging");
-    let mock_users = vec![
-        serde_json::json!({
-            "id": "d399e0be-8f86-47d2-a01f-912dd19177e5",
-            "username": "admin",
-            "email": "admin@viworks.com",
-            "status": "active",
-            "created_at": "2025-09-02T12:27:24.743656Z",
-            "last_login_at": null
-        })
-    ];
-    
-    info!("✅ Returning {} mock users to frontend", mock_users.len());
-    HttpResponse::Ok().json(serde_json::json!({
-        "success": true,
-        "users": mock_users
-    }))
+    if let Some(pool) = pool.as_ref() {
+        info!("✅ Database pool is available");
+        
+        // Use a more robust query with proper error handling
+        let query_result = sqlx::query_as::<_, UserRow>(
+            "SELECT id, username, email, status, created_at, last_login_at FROM users ORDER BY created_at DESC"
+        )
+        .fetch_all(pool)
+        .await;
+        
+        match query_result {
+            Ok(rows) => {
+                info!("✅ Found {} users in database", rows.len());
+                let mut users = Vec::new();
+                
+                for row in rows {
+                    let user_json = serde_json::json!({
+                        "id": row.id.to_string(),
+                        "username": row.username,
+                        "email": row.email,
+                        "status": row.status,
+                        "created_at": row.created_at.to_rfc3339(),
+                        "last_login_at": row.last_login_at.map(|dt| dt.to_rfc3339())
+                    });
+                    users.push(user_json);
+                }
+                
+                info!("✅ Returning {} users to frontend", users.len());
+                HttpResponse::Ok().json(serde_json::json!({
+                    "success": true,
+                    "users": users
+                }))
+            }
+            Err(e) => {
+                error!("❌ Database query failed: {}", e);
+                HttpResponse::InternalServerError().json(serde_json::json!({
+                    "success": false,
+                    "message": format!("Database query failed: {}", e)
+                }))
+            }
+        }
+    } else {
+        error!("❌ Database pool is not available");
+        HttpResponse::InternalServerError().json(serde_json::json!({
+            "success": false,
+            "message": "Database not available"
+        }))
+    }
+}
+
+// Define the UserRow struct for type-safe database queries
+#[derive(Debug, sqlx::FromRow)]
+struct UserRow {
+    id: Uuid,
+    username: String,
+    email: String,
+    status: String,
+    created_at: chrono::DateTime<chrono::Utc>,
+    last_login_at: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 // Admin panel endpoint functions
