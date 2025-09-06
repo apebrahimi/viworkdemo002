@@ -643,24 +643,69 @@ struct UserRow {
 }
 
 // Admin panel endpoint functions
-async fn get_sessions(_pool: web::Data<Option<PgPool>>) -> HttpResponse {
+async fn get_sessions(pool: web::Data<Option<PgPool>>) -> HttpResponse {
     info!("📋 Fetching sessions from database...");
     
-    // For now, return mock sessions since we don't have a sessions table yet
-    let mock_sessions = vec![
-        serde_json::json!({
-            "session_id": "SID123",
-            "username": "admin",
-            "access_token": "demo_access_token_SID123",
-            "created_at": Utc::now().to_rfc3339(),
-            "otp_expires": (Utc::now() + Duration::minutes(5)).to_rfc3339(),
-        })
-    ];
-    
-    HttpResponse::Ok().json(serde_json::json!({
-        "success": true,
-        "sessions": mock_sessions
-    }))
+    match &*pool {
+        Some(pool) => {
+            match sqlx::query!(
+                r#"
+                SELECT 
+                    s.id, s.user_id, u.username, s.status, s.started_at, s.expires_at, 
+                    s.last_activity_at, s.ip_address::text as ip_address, s.user_agent
+                FROM sessions s
+                JOIN users u ON s.user_id = u.id
+                ORDER BY s.started_at DESC
+                LIMIT 50
+                "#
+            )
+            .fetch_all(pool)
+            .await
+            {
+                Ok(sessions) => {
+                    let session_responses: Vec<serde_json::Value> = sessions
+                        .into_iter()
+                        .map(|row| {
+                            let is_active = row.status == Some("active".to_string()) && 
+                                          row.expires_at > Utc::now();
+                            let is_revoked = row.status == Some("terminated".to_string());
+                            
+                            serde_json::json!({
+                                "session_id": row.id.to_string(),
+                                "username": row.username,
+                                "access_token": "***hidden***",
+                                "created_at": row.started_at.map(|dt| dt.to_rfc3339()).unwrap_or_else(|| Utc::now().to_rfc3339()),
+                                "otp_expires": row.expires_at.to_rfc3339(),
+                                "last_activity": row.last_activity_at.map(|dt| dt.to_rfc3339()).unwrap_or_else(|| Utc::now().to_rfc3339()),
+                                "ip_address": row.ip_address.unwrap_or_else(|| "نامشخص".to_string()),
+                                "user_agent": row.user_agent.unwrap_or_else(|| "دسکتاپ".to_string()),
+                                "status": if is_revoked { "terminated" } else if is_active { "active" } else { "expired" }
+                            })
+                        })
+                        .collect();
+                    
+                    HttpResponse::Ok().json(serde_json::json!({
+                        "success": true,
+                        "sessions": session_responses
+                    }))
+                }
+                Err(e) => {
+                    error!("❌ Database query failed: {}", e);
+                    HttpResponse::InternalServerError().json(serde_json::json!({
+                        "success": false,
+                        "error": "Database query failed"
+                    }))
+                }
+            }
+        }
+        None => {
+            error!("❌ Database pool not available");
+            HttpResponse::InternalServerError().json(serde_json::json!({
+                "success": false,
+                "error": "Database not available"
+            }))
+        }
+    }
 }
 
 async fn get_device_requests(_pool: web::Data<Option<PgPool>>) -> HttpResponse {
